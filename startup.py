@@ -213,7 +213,8 @@ class SubstancePainterLauncher(SoftwareLauncher):
     # with an appropriate glob or regex string.
 
     EXECUTABLE_TEMPLATES = {
-        "darwin": ["/Applications/Allegorithmic/Substance Painter.app"],
+        #"darwin": ["/Applications/Allegorithmic/Substance Painter.app"], -- updated 20250902
+        "darwin": ["/Applications/Adobe Substance 3D Painter/Adobe Substance 3D Painter.app"],
         "win32": ["C:/Program Files/Allegorithmic/Substance Painter/Substance Painter.exe"],
         "linux2": [
             "/usr/Allegorithmic/Substance Painter",

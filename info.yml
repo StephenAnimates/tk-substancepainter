@@ -101,11 +101,11 @@ configuration:
 requires_shotgun_fields:
         
 # More verbose description of this item 
-display_name: "Shotgun Engine for Substance Painter"
-description: "Shotgun Integration for Substance Painter"
+display_name: "Flow Production Tracking (ShotGrid/Shotgun) Engine for Adobe Substance Painter"
+description: "Flow Production Tracking (ShotGrid/Shotgun) Integration for Substance Painter"
 
 # Required minimum versions for this item to run
-requires_shotgun_version:
+requires_shotgun_version: 
 requires_core_version: "v0.18.8"
 
 frameworks:
