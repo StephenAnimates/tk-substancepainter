@@ -35,38 +35,28 @@ UNKNOWN_VERSION = "UNKNOWN_VERSION"
 MINIMUM_SUPPORTED_VERSION = "2018.3"
 
 
-def to_new_version_system(version):
+def to_normalized_version(version):
     """
     Converts a version string into a new style version.
 
-    New version system was introduced in version 2020.1, that became
-    version 6.1.0, so we need to do some magic to normalize versions.
+    - Old versions (e.g., "2.6.2") are left as is.
+    - Year-based versions (e.g., "2018.3.1") are converted to a major
+      version number by subtracting 2014. For example, "2018.3.1" becomes "4.3.1".
+      This was the scheme introduced in 2017.1 (which became 3.1).
+    - Modern semantic versions (e.g., "6.1.0", "11.0.3") are left as is.
+
     https://docs.substance3d.com/spdoc/version-2020-1-6-1-0-194216357.html
-
-    The way we support this new version system is to use LooseVersion for
-    version comparisons. We modify the major version if the version is higher 
-    than 2017.1.0 for the version to become in the style of 6.1, by literally
-    subtracting 2014 to the major version component.
-    This leaves us always with a predictable version system:
-        2.6.2  -> 2.6.2 (really old version)
-        2017.1 -> 3.1
-        2018.0 -> 4.0
-        2020.1 -> 6.1 (newer version system starts)
-        6.2    -> 6.2 ...
-
-    2017.1.0 represents the first time the 2k style version was introduced
-    according to:
     https://docs.substance3d.com/spdoc/all-changes-188973073.html
 
-    Note that this change means that the LooseVersion is good for comparisons 
-    but NEVER for printing, it would simply print the same version as 
-    LooseVersion does not support rebuilding of the version string from it's 
-    components
+    :param version: Version string to normalize.
+    :returns: A `distutils.version.LooseVersion` object.
     """
 
     version = LooseVersion(str(version))
 
-    if version >= LooseVersion("2017.1"):
+    # The year-based versions started with 2017 and had a major version > 2000.
+    # Modern versions (6.x, 11.x) have a much smaller major version.
+    if version.version[0] >= 2017:
         version.version[0] -= 2014
     return version
 
@@ -203,20 +193,19 @@ class SubstancePainterLauncher(SoftwareLauncher):
     # variable components of the path in one place.
 
     # It seems that Substance Painter does not use any version number in the
-    # installation folders, as if they do not support multiple versions of
-    # the same software.
+    # installation folders.
     COMPONENT_REGEX_LOOKUP = {}
 
     # This dictionary defines a list of executable template strings for each
     # of the supported operating systems. The templates are used for both
-    # globbing and regex matches by replacing the named format placeholders
+    # globbing and regex matches by replacing the named format placeholders.
     # with an appropriate glob or regex string.
 
     EXECUTABLE_TEMPLATES = {
-        #"darwin": ["/Applications/Allegorithmic/Substance Painter.app"], -- updated 20250902
-        "darwin": ["/Applications/Adobe Substance 3D Painter/Adobe Substance 3D Painter.app"],
-        "win32": ["C:/Program Files/Allegorithmic/Substance Painter/Substance Painter.exe"],
+        "darwin": ["/Applications/Adobe Substance 3D Painter/Adobe Substance 3D Painter.app", "/Applications/Allegorithmic/Substance Painter.app"],
+        "win32": ["C:/Program Files/Adobe/Adobe Substance 3D Painter/Adobe Substance 3D Painter.exe", "C:/Program Files/Allegorithmic/Substance Painter/Substance Painter.exe"],
         "linux2": [
+            "/opt/Adobe/Adobe_Substance_3D_Painter/Adobe_Substance_3D_Painter",
             "/usr/Allegorithmic/Substance Painter",
             "/usr/Allegorithmic/Substance_Painter/Substance Painter",
             "/opt/Allegorithmic/Substance_Painter/Substance Painter",
@@ -298,12 +287,15 @@ class SubstancePainterLauncher(SoftwareLauncher):
                 None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, path_buffer
             )
 
-            user_scripts_path = path_buffer.value + r"\Allegorithmic\Substance Painter\plugins"
+            # Check for new and old plugin paths
+            user_scripts_path = os.path.join(path_buffer.value, "Adobe", "Adobe Substance 3D Painter", "plugins")
+            if not os.path.exists(user_scripts_path):
+                user_scripts_path = os.path.join(path_buffer.value, "Allegorithmic", "Substance Painter", "plugins")
 
         else:
-            user_scripts_path = os.path.expanduser(
-                r"~/Documents/Allegorithmic/Substance Painter/plugins"
-            )
+            user_scripts_path = os.path.expanduser(r"~/Documents/Adobe/Adobe Substance 3D Painter/plugins")
+            if not os.path.exists(user_scripts_path):
+                user_scripts_path = os.path.expanduser(r"~/Documents/Allegorithmic/Substance Painter/plugins")
 
         ensure_scripts_up_to_date(resources_plugins_path, user_scripts_path)
 
@@ -358,11 +350,11 @@ class SubstancePainterLauncher(SoftwareLauncher):
             return (True, "")
 
         # convert to new version system if required
-        version = to_new_version_system(sw_version.version)
+        version = to_normalized_version(sw_version.version)
 
         # second, compare against the minimum version
         if self.minimum_supported_version:
-            min_version = to_new_version_system(self.minimum_supported_version)
+            min_version = to_normalized_version(self.minimum_supported_version)
 
             if version < min_version:
                 # the version is older than the minimum supported version

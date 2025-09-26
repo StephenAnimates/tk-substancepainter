@@ -8,8 +8,10 @@
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
-"""A Substance Painter engine for Tank.
-https://www.allegorithmic.com/products/substance-painter
+"""
+A Substance Painter engine for Flow Production Tracking (ShotGrid)
+https://www.adobe.com/products/substance3d.html
+
 """
 
 import os
@@ -27,10 +29,8 @@ from tank.platform import Engine
 from tank.platform.constants import SHOTGUN_ENGINE_NAME
 from tank.platform.constants import TANK_ENGINE_INIT_HOOK_NAME
 
-
 __author__ = "Diego Garcia Huerta"
 __contact__ = "https://www.linkedin.com/in/diegogh/"
-
 
 # env variable that control if to show the compatibility warning dialog
 # when Substance Painter software version is above the tested one.
@@ -38,39 +38,28 @@ SHOW_COMP_DLG = "SGTK_COMPATIBILITY_DIALOG_SHOWN"
 
 MINIMUM_SUPPORTED_VERSION = "2018.3"
 
-
-def to_new_version_system(version):
+def to_normalized_version(version):
     """
     Converts a version string into a new style version.
 
-    New version system was introduced in version 2020.1, that became
-    version 6.1.0, so we need to do some magic to normalize versions.
+    - Old versions (e.g., "2.6.2") are left as is.
+    - Year-based versions (e.g., "2018.3.1") are converted to a major
+      version number by subtracting 2014. For example, "2018.3.1" becomes "4.3.1".
+      This was the scheme introduced in 2017.1 (which became 3.1).
+    - Modern semantic versions (e.g., "6.1.0", "11.0.3") are left as is.
+
     https://docs.substance3d.com/spdoc/version-2020-1-6-1-0-194216357.html
-
-    The way we support this new version system is to use LooseVersion for
-    version comparisons. We modify the major version if the version is higher 
-    than 2017.1.0 for the version to become in the style of 6.1, by literally
-    subtracting 2014 to the major version component.
-    This leaves us always with a predictable version system:
-        2.6.2  -> 2.6.2 (really old version)
-        2017.1 -> 3.1
-        2018.0 -> 4.0
-        2020.1 -> 6.1 (newer version system starts)
-        6.2    -> 6.2 ...
-
-    2017.1.0 represents the first time the 2k style version was introduced
-    according to:
     https://docs.substance3d.com/spdoc/all-changes-188973073.html
 
-    Note that this change means that the LooseVersion is good for comparisons 
-    but NEVER for printing, it would simply print the same version as 
-    LooseVersion does not support rebuilding of the version string from it's 
-    components
+    :param version: Version string to normalize.
+    :returns: A `distutils.version.LooseVersion` object.
     """
 
     version = LooseVersion(str(version))
 
-    if version >= LooseVersion("2017.1"):
+    # The year-based versions started with 2017 and had a major version > 2000.
+    # Modern versions (6.x, 11.x) have a much smaller major version.
+    if version.version[0] >= 2017:
         version.version[0] -= 2014
     return version
 
@@ -96,12 +85,10 @@ def display_debug(msg):
         t = time.asctime(time.localtime())
         print("%s - Shotgun Debug | Substance Painter engine | %s " % (t, msg))
 
-
 # methods to support the state when the engine cannot start up
 # for example if a non-tank file is loaded in Substance Painter we load the
 # project context if exists, so we give a chance to the user to at least
 # do the basics operations.
-
 
 def refresh_engine(scene_name, prev_context):
     """
@@ -451,8 +438,8 @@ class SubstancePainterEngine(Engine):
         # New version system was introduced in version 2020.1, that became
         # version 6.1.0, so we need to do some magic to normalize versions.
         # https://docs.substance3d.com/spdoc/version-2020-1-6-1-0-194216357.html
-        painter_version = to_new_version_system(painter_version_str)
-        painter_min_supported_version = to_new_version_system(MINIMUM_SUPPORTED_VERSION)
+        painter_version = to_normalized_version(painter_version_str)
+        painter_min_supported_version = to_normalized_version(MINIMUM_SUPPORTED_VERSION)
 
         if painter_version < painter_min_supported_version:
             msg = (
@@ -483,7 +470,7 @@ class SubstancePainterEngine(Engine):
                 # setting
                 min_version_str = self.get_setting("compatibility_dialog_min_version")
 
-                min_version = to_new_version_system(min_version_str)
+                min_version = to_normalized_version(min_version_str)
                 if painter_version < min_version:
                     show_warning_dlg = False
 

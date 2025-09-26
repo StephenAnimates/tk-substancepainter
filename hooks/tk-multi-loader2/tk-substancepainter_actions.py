@@ -9,21 +9,19 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 """
-Hook that loads defines all the available actions, broken down by publish type. 
+Hook that loads defines all the available actions, broken down by publish type.
+
+Based on Diego Garcia Huerta's tk-substancepainter on Github
+
 """
 
 import os
-
 import sgtk
-from sgtk.errors import TankError
 
-
-__author__ = "Diego Garcia Huerta"
-__contact__ = "https://www.linkedin.com/in/diegogh/"
-
+__author__ = "Stephen Studyvin"
+__contact__ = "https://www.linkedin.com/in/stephenanimates/"
 
 HookBaseClass = sgtk.get_hook_baseclass()
-
 
 publishedfile_type_to_actions = {
     "Image": ("environment", "colorlut", "alpha", "texture"),
@@ -59,8 +57,14 @@ publishedfile_type_to_actions = {
     "Spmsk File": ["smartmask"],
 }
 
-
 class SubstancePainterActions(HookBaseClass):
+
+    def __init__(self, *args, **kwargs):
+        """
+        Initialize the hook.
+        """
+        super(SubstancePainterActions, self).__init__(*args, **kwargs)
+        self.engine = sgtk.platform.current_engine()
 
     ###########################################################################
     # public interface - to be overridden by deriving classes
@@ -103,10 +107,8 @@ class SubstancePainterActions(HookBaseClass):
         In this case, when more than  one object isvreturned for an action, use
         the params key to pass additional data into the run_action hook.
 
-        :param sg_publish_data: Shotgun data dictionary with all the standard
-                                publish fields. 
-        :param actions: List of action strings which have been
-                        defined in the app configuration. 
+        :param sg_publish_data: Shotgun data dictionary with all the standard publish fields. 
+        :param actions: List of action strings which have been defined in the app configuration. 
         :param ui_area: String denoting the UI Area (see above).
         :returns List of dictionaries, each with keys name, params, caption 
          and description
@@ -202,5 +204,9 @@ class SubstancePainterActions(HookBaseClass):
         path = self.get_publish_path(sg_publish_data).replace(os.path.sep, "/")
 
         usage = params
-        engine = sgtk.platform.current_engine()
-        result = engine.app.import_project_resource(path, usage, "Shotgun")
+        result = self.engine.app.import_project_resource(path, usage, "Shotgun")
+
+        if not result:
+            app.log_error(
+                "Failed to import resource '%s' as usage '%s'." % (path, usage)
+            )

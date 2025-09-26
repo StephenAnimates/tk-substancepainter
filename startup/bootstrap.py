@@ -9,14 +9,13 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 """
-This file is loaded automatically by SubstancePainter at startup
+This file is loaded automatically by Adobe Substance 3D Painter at startup
 It sets up the Toolkit context and prepares the tk-substancepainter engine.
 """
 
 import os
 import sys
 import traceback
-
 
 __author__ = "Diego Garcia Huerta"
 __email__ = "diegogh2000@gmail.com"

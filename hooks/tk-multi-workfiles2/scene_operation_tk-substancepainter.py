@@ -14,10 +14,8 @@ from sgtk.platform.qt import QtGui
 
 HookClass = sgtk.get_hook_baseclass()
 
-
 __author__ = "Diego Garcia Huerta"
 __contact__ = "https://www.linkedin.com/in/diegogh/"
-
 
 class SceneOperation(HookClass):
     """
