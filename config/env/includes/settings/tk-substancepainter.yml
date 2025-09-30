@@ -17,13 +17,6 @@
 includes:
 - ../app_locations.yml
 - ../engine_locations.yml
-- ./tk-multi-breakdown.yml
-- ./tk-multi-loader2.yml
-- ./tk-multi-publish2.yml
-- ./tk-multi-screeningroom.yml
-- ./tk-multi-shotgunpanel.yml
-- ./tk-multi-snapshot.yml
-- ./tk-multi-workfiles2.yml
 
 ################################################################################
 
@@ -32,9 +25,41 @@ settings.tk-substancepainter.asset:
   apps:
     tk-multi-about:
       location: "@apps.tk-multi-about.location"
-    tk-multi-screeningroom: "@settings.tk-multi-screeningroom.rv"
-    tk-multi-shotgunpanel: "@settings.tk-multi-shotgunpanel.substancepainter"
-    tk-multi-workfiles2: "@settings.tk-multi-workfiles2.substancepainter.project"
+    tk-multi-screeningroom:
+      location: "@apps.tk-multi-screeningroom.location"
+    tk-multi-shotgunpanel:
+      location: "@apps.tk-multi-shotgunpanel.location"
+    tk-multi-workfiles2:
+      allow_task_creation: true
+      create_new_task_hook: "{self}/create_new_task.py"
+      custom_actions_hook: "{self}/custom_actions.py"
+      entities:
+      - caption: Assets
+        entity_type: Task
+        filters:
+        - [entity, type_is, Asset]
+        hierarchy: [entity.Asset.sg_asset_type, entity, step, content]
+      - caption: Shots
+        entity_type: Task
+        filters:
+        - [entity, type_is, Shot]
+        hierarchy: [entity.Shot.sg_sequence, entity, step, content]
+      file_extensions: []
+      hook_copy_file: "{self}/copy_file.py"
+      hook_filter_publishes: default
+      hook_filter_work_files: default
+      hook_scene_operation: "{engine}/tk-multi-workfiles2/scene_operation_tk-substancepainter.py"
+      launch_at_startup: false
+      my_tasks_extra_display_fields: []
+      saveas_default_name: scene
+      saveas_prefer_version_up: false
+      show_my_tasks: true
+      template_publish:
+      template_publish_area:
+      template_work:
+      template_work_area:
+      version_compare_ignore_fields: []
+      location: "@apps.tk-multi-workfiles2.location"
     tk-multi-pythonconsole:
       location: "@apps.tk-multi-pythonconsole.location"
   menu_favourites:
@@ -47,13 +72,74 @@ settings.tk-substancepainter.asset_step:
   apps:
     tk-multi-about:
       location: "@apps.tk-multi-about.location"
-    tk-multi-loader2: "@settings.tk-multi-loader2.substancepainter"
-    tk-multi-breakdown: "@settings.tk-multi-breakdown.substancepainter"
-    tk-multi-publish2: "@settings.tk-multi-publish2.substancepainter.asset_step"
-    tk-multi-screeningroom: "@settings.tk-multi-screeningroom.rv"
-    tk-multi-shotgunpanel: "@settings.tk-multi-shotgunpanel.substancepainter"
-    tk-multi-snapshot: "@settings.tk-multi-snapshot.substancepainter.asset_step"
-    tk-multi-workfiles2: "@settings.tk-multi-workfiles2.substancepainter.asset_step"
+    tk-multi-loader2:
+      action_mappings:
+        Image: [Import Project Resource as texture]
+        Texture: [Import Project Resource as texture]
+        Rendered Image: [Import Project Resource as texture]
+        Substance Material Preset: [Import Project Resource as preset]
+        Sppr File: [Import Project Resource as preset]
+        PopcornFX: [Import Project Resource as script]
+        Pkfx File: [Import Project Resource as script]
+        Shader: [Import Project Resource as shader]
+        Glsl File: [Import Project Resource as shader]
+        Substance Export Preset: [Import Project Resource as export]
+        Spexp File: [Import Project Resource as export]
+        Substance Smart Material: [Import Project Resource as smartmaterial]
+        Spsm File: [Import Project Resource as smartmaterial]
+        Substance File: [Import Project Resource as basematerial]
+        Sbsar File: [Import Project Resource as basematerial]
+        Substance Smart Mask: [Import Project Resource as smartmask]
+        Spmsk File: [Import Project Resource as smartmask]
+      actions_hook: "{engine}/tk-multi-loader2/tk-substancepainter_actions.py"
+      location: "@apps.tk-multi-loader2.location"
+    tk-multi-breakdown:
+      hook_scene_operations: "{engine}/tk-multi-breakdown/tk-substancepainter_scene_operations.py"
+      location: "@apps.tk-multi-breakdown.location"
+    tk-multi-publish2:
+      collector: "{self}/collector.py:{engine}/tk-multi-publish2/basic/collector.py"
+      collector_settings:
+          Work Template: substancepainter_asset_work
+          Work Export Template: substancepainter_asset_textures_path_export
+          Publish Textures as Folder: true
+      publish_plugins:
+      - name: Publish to Flow Production Tracking
+        hook: "{self}/publish_file.py"
+        settings: {}
+      - name: Publish to Flow Production Tracking
+        hook: "{self}/publish_file.py:{engine}/tk-multi-publish2/basic/publish_textures.py"
+        settings:
+          Publish Template: substancepainter_asset_textures_path_publish
+      - name: Publish to Flow Production Tracking
+        hook: "{self}/publish_file.py:{engine}/tk-multi-publish2/basic/publish_texture.py"
+        settings:
+          Publish Template: substancepainter_asset_texture_path_publish
+      - name: Upload for review
+        hook: "{self}/upload_version.py"
+        settings: {}
+      - name: Begin file versioning
+        hook: "{engine}/tk-multi-publish2/basic/start_version_control.py"
+        settings: {}
+      - name: Publish to Flow Production Tracking
+        hook: "{self}/publish_file.py:{engine}/tk-multi-publish2/basic/publish_session.py"
+        settings:
+            Publish Template: substancepainter_asset_publish
+      location: "@apps.tk-multi-publish2.location"
+    tk-multi-screeningroom:
+      location: "@apps.tk-multi-screeningroom.location"
+    tk-multi-shotgunpanel:
+      location: "@apps.tk-multi-shotgunpanel.location"
+    tk-multi-snapshot:
+      hook_scene_operation: "{engine}/tk-multi-snapshot/scene_operation_tk-substancepainter.py"
+      template_snapshot: substancepainter_asset_snapshot
+      location: "@apps.tk-multi-snapshot.location"
+    tk-multi-workfiles2:
+      hook_scene_operation: "{engine}/tk-multi-workfiles2/scene_operation_tk-substancepainter.py"
+      template_publish: substancepainter_asset_publish
+      template_publish_area: asset_publish_area_substancepainter
+      template_work: substancepainter_asset_work
+      template_work_area: asset_work_area_substancepainter
+      location: "@apps.tk-multi-workfiles2.location"
     tk-multi-pythonconsole:
       location: "@apps.tk-multi-pythonconsole.location"
   menu_favourites:
@@ -61,20 +147,39 @@ settings.tk-substancepainter.asset_step:
   - {app_instance: tk-multi-snapshot, name: Snapshot...}
   - {app_instance: tk-multi-workfiles2, name: File Save...}
   - {app_instance: tk-multi-publish2, name: Publish...}
-  template_project: asset_work_area_substancepainter
-  location: "@engines.tk-substancepainter.location"
 
 # project
 settings.tk-substancepainter.project:
   apps:
     tk-multi-about:
       location: "@apps.tk-multi-about.location"
-    tk-multi-screeningroom: "@settings.tk-multi-screeningroom.rv"
-    tk-multi-shotgunpanel: "@settings.tk-multi-shotgunpanel.substancepainter"
-    tk-multi-workfiles2: "@settings.tk-multi-workfiles2.substancepainter.project"
+    tk-multi-screeningroom:
+      location: "@apps.tk-multi-screeningroom.location"
+    tk-multi-shotgunpanel:
+      location: "@apps.tk-multi-shotgunpanel.location"
+    tk-multi-workfiles2:
+      allow_task_creation: true
+      create_new_task_hook: "{self}/create_new_task.py"
+      custom_actions_hook: "{self}/custom_actions.py"
+      entities:
+      - caption: Assets
+        entity_type: Task
+        filters:
+        - [entity, type_is, Asset]
+        hierarchy: [entity.Asset.sg_asset_type, entity, step, content]
+      - caption: Shots
+        entity_type: Task
+        filters:
+        - [entity, type_is, Shot]
+        hierarchy: [entity.Shot.sg_sequence, entity, step, content]
+      file_extensions: []
+      hook_copy_file: "{self}/copy_file.py"
+      hook_filter_publishes: default
+      hook_filter_work_files: default
+      hook_scene_operation: "{engine}/tk-multi-workfiles2/scene_operation_tk-substancepainter.py"
+      location: "@apps.tk-multi-workfiles2.location"
     tk-multi-pythonconsole:
       location: "@apps.tk-multi-pythonconsole.location"
   menu_favourites:
   - {app_instance: tk-multi-workfiles2, name: File Open...}
   location: "@engines.tk-substancepainter.location"
-  compatibility_dialog_min_version: 2021
