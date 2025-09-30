@@ -16,7 +16,7 @@
 # These are the additions to get substancepainter engine up and running with the 
 # default tk-apps for this environment
 
-# substance painter
+# Adobe Substance 3D Painter
 settings.tk-multi-loader2.substancepainter:
   actions_hook: '{engine}/tk-multi-loader2/tk-substancepainter_actions.py'
   action_mappings:

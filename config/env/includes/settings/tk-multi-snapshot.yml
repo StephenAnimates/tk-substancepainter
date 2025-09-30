@@ -16,7 +16,9 @@
 # These are the additions to get substancepainter engine up and running with the 
 # default tk-apps for this environment
 
-# ---- Substance Painter
+################################################################################
+
+# ---- Adobe Substance 3D Painter
 
 # asset step
 settings.tk-multi-snapshot.substancepainter.asset_step:

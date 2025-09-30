@@ -19,7 +19,7 @@
 
 ################################################################################
 
-# -- substancepainter
+# -- Adobe Substance 3D Painter
 
 settings.tk-multi-workfiles2.substancepainter.project:
   allow_task_creation: true

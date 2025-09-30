@@ -16,6 +16,7 @@
 # These are the additions to get substancepainter engine up and running with the 
 # default tk-apps for this environment
 
+# Adobe Substance 3D Painter
 settings.tk-multi-breakdown.substancepainter:
   hook_scene_operations: '{engine}/tk-multi-breakdown/tk-substancepainter_scene_operations.py'
   location: "@apps.tk-multi-breakdown.location"

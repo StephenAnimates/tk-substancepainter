@@ -35,14 +35,14 @@ If you are familiar with how to setup an engine and apps, you might want to skip
 
 If you are new to Flow Production Tracking, I also recommend to read at least the following FlowPTR articles, so you get familiar with how the configuration files are setup, and the terminology used:
 
-* [App and Engine Configuration Reference](https://support.shotgunsoftware.com/hc/en-us/articles/219039878-App-and-Engine-Configuration-Reference)
-* [Overview of Toolkit's New Default Configuration](https://support.shotgunsoftware.com/hc/en-us/articles/115004077494-Overview-of-Toolkit-s-New-Default-Configuration-)
+* [App and Engine Configuration Reference](https://help.autodesk.com/view/SGDEV/ENU/?guid=SGD_pg_integrations_admin_guides_apps_and_engines_configuration_html)
+* [Overview of Toolkit's New Default Configuration](https://help.autodesk.com/view/SGDEV/ENU/?guid=SGD_pg_integrations_admin_guides_integrations_admin_guide_html#the-default-config)
 
 Here are detailed instructions on how to make this engine work assuming you use a standard Flow Production Tracking (ShotGrid/Shotgun) toolkit installation and have downloaded FlowPTR desktop.
 1. Log in into your FlowPTR site.
 2. Click on **Apps** > **Desktop App** and follow the instructions (Alternatly, click on your avatar > **Manage Apps** then follow the link to Desktop App)
 
-[Flow Production Tracking (ShotGrid/Shotgun) Desktop Download Instructions](https://support.shotgunsoftware.com/hc/en-us/articles/115000068574#Getting%20started%20with%20Shotgun%20Desktop)
+[Flow Production Tracking (ShotGrid/Shotgun) Desktop Download Instructions](https://help.autodesk.com/view/SGDEV/ENU/?guid=SG_Supervisor_Artist_sa_integrations_sa_integrations_user_guide_html#getting-started-with-flow-production-tracking-desktop)
 [Direct Download to Current MacOS Installer](https://sg-software.ems.autodesk.com/deploy/desktop/FlowProductionTrackingInstaller_Current.dmg)
 [Direct Download to Current Linux Installer](https://sg-software.ems.autodesk.com/deploy/desktop/flow_production_tracking-current-1.x86_64.rpm)
 [Direct Download to Current Windows Installer](https://sg-software.ems.autodesk.com/deploy/desktop/FlowProductionTrackingInstaller_Current.exe)
@@ -52,9 +52,11 @@ Here are detailed instructions on how to make this engine work assuming you use 
 If you haven't done it yet, make sure you have gone through the basic steps to configure your project to use FlowPTR toolkit, this can be done in the desktop app, by clicking on the project icon to open it.
 
 * *Select a configuration*: "Shotgun Default" or pick an existing porject that you have already setup pages and filters for.
+
 ![select_a_project_configuration](https://raw.githubusercontent.com/StephenAnimates/tk-substancepainter/master/config/images/select_a_project_configuration.png)
 
 * *Select a FlowPTR Configuration*: select "default" which will download the standard templates from FlowPTR. (this documentation is written assuming you have this configuration)
+
 ![select_a_shotgun_configuration](https://raw.githubusercontent.com/StephenAnimates/tk-substancepainter/master/config/images/select_a_shotgun_configuration.png)
 
 * *Define Storages*: Make sure you name your first storage "primary", and a choose a primary folder where all the 'jobs' publishes will be stored, in this case "D:\demo\jobs" for illustrative purposes.
@@ -87,6 +89,7 @@ If you haven't done it yet, make sure you have gone through the basic steps to c
             └───frameworks
 ```
 (Note that this might not be suitable for more complex setups, like distributed configurations)
+
 ![select_deployment](config/images/select_deployment.png)
 
 ## Modifying the toolkit configuration files to add this engine and related apps
@@ -101,24 +104,28 @@ These yaml files provided **should be merged with the original ones as they won'
 
 As an example, for the location of the engine, we use a git descriptor that allows up to track the code from a git repository. This allows easy updates, whenever a new version is released. So in the example above, you should modify the file:
 ``.../game_config/config/env/includes/engine_locations.yml``
+or
+```
+~/Library/Caches/Shotgun/bundle_cache/github/shotgunsoftware/tk-config-default2/refs/tags/v1.7.5/env/includes/engine_locations.yml
+```
 
 and add the following changes from this file:
 [engine_locations.yml](config/env/includes/engine_locations.yml)
 
 **Make sure to check for the latest version of the engine** here and use the version number in the version section below:
-[tk-substancepainter releases](https://github.com/diegogarciahuerta/tk-substancepainter/releases)
+[tk-substancepainter releases](https://github.com/StephenAnimates/tk-substancepainter/releases)
 
 ```yaml
 # Adobe Substance 3D Painter
 engines.tk-substancepainter.location:
   type: git
   branch: master
-  path: https://github.com/diegogarciahuerta/tk-substancepainter.git
-  version: v1.0.0
+  path: https://github.com/StephenAnimates/tk-substancepainter
+  version: v2.0.1
 ```
 
 Or in your environments you should add tk-substancepainter yml file, for example in the asset_step yml file:
-``/configs/game_config/env/asset_step.yml``
+``env/asset_step.yml``
 
 Let's add the include at the beginning of the file, in the 'includes' section:
 ```

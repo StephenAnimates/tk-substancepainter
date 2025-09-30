@@ -13,10 +13,10 @@
 #
 # YOU SHOULD MERGE these entries into your settings file, as
 # THIS FILE BY ITSELF WILL NOT WORK 
-# These are the additions to get substancepainter engine up and running with the 
+# These are the additions to get Adobe Substance 3D Painter engine up and running with the 
 # default tk-apps for this environment
 
-# substancepainter
+# Adobe Substance 3D Painter
 settings.tk-multi-shotgunpanel.substancepainter:
   action_mappings:
     PublishedFile:
