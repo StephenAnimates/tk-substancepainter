@@ -8,6 +8,14 @@
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
+# Original code by: Diego Garcia Huerta, https://www.linkedin.com/in/diegogh/
+# Updated by: Stephen Studyvin
+
+# Updated:
+# September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
+
+# https://help.autodesk.com/view/SGDEV/ENU/
+
 """
 A Substance Painter engine for Flow Production Tracking (ShotGrid)
 https://www.adobe.com/products/substance3d.html
@@ -21,7 +29,6 @@ import inspect
 import logging
 import traceback
 from functools import wraps
-from distutils.version import LooseVersion
 
 import tank
 from tank.log import LogManager
@@ -38,52 +45,27 @@ SHOW_COMP_DLG = "SGTK_COMPATIBILITY_DIALOG_SHOWN"
 
 MINIMUM_SUPPORTED_VERSION = "2018.3"
 
-def to_normalized_version(version):
-    """
-    Converts a version string into a new style version.
-
-    - Old versions (e.g., "2.6.2") are left as is.
-    - Year-based versions (e.g., "2018.3.1") are converted to a major
-      version number by subtracting 2014. For example, "2018.3.1" becomes "4.3.1".
-      This was the scheme introduced in 2017.1 (which became 3.1).
-    - Modern semantic versions (e.g., "6.1.0", "11.0.3") are left as is.
-
-    https://docs.substance3d.com/spdoc/version-2020-1-6-1-0-194216357.html
-    https://docs.substance3d.com/spdoc/all-changes-188973073.html
-
-    :param version: Version string to normalize.
-    :returns: A `distutils.version.LooseVersion` object.
-    """
-
-    version = LooseVersion(str(version))
-
-    # The year-based versions started with 2017 and had a major version > 2000.
-    # Modern versions (6.x, 11.x) have a much smaller major version.
-    if version.version[0] >= 2017:
-        version.version[0] -= 2014
-    return version
-
 
 # logging functionality
 def display_error(msg):
     t = time.asctime(time.localtime())
-    print("%s - Shotgun Error | Substance Painter engine | %s " % (t, msg))
+    print("%s - FlowPTR Error | Substance 3D Painter engine | %s " % (t, msg))
 
 
 def display_warning(msg):
     t = time.asctime(time.localtime())
-    print("%s - Shotgun Warning | Substance Painter engine | %s " % (t, msg))
+    print("%s - FlowPTR Warning | Substance 3D Painter engine | %s " % (t, msg))
 
 
 def display_info(msg):
     t = time.asctime(time.localtime())
-    print("%s - Shotgun Info | Substance Painter engine | %s " % (t, msg))
+    print("%s - FlowPTR Info | Substance 3D Painter engine | %s " % (t, msg))
 
 
 def display_debug(msg):
     if os.environ.get("TK_DEBUG") == "1":
         t = time.asctime(time.localtime())
-        print("%s - Shotgun Debug | Substance Painter engine | %s " % (t, msg))
+        print("%s - FlowPTR Debug | Substance 3D Painter engine | %s " % (t, msg))
 
 # methods to support the state when the engine cannot start up
 # for example if a non-tank file is loaded in Substance Painter we load the
@@ -92,7 +74,7 @@ def display_debug(msg):
 
 def refresh_engine(scene_name, prev_context):
     """
-    refresh the current engine
+    Refresh the current engine
     """
 
     engine = tank.platform.current_engine()
@@ -109,7 +91,7 @@ def refresh_engine(scene_name, prev_context):
         if prev_context and prev_context != engine.context:
             engine.change_context(prev_context)
 
-        # shotgun menu may have been removed, so add it back in if its not
+        # FlowPTR menu may have been removed, so add it back in if its not
         # already there.
         engine.create_shotgun_menu()
         return
@@ -126,26 +108,24 @@ def refresh_engine(scene_name, prev_context):
         # and construct the new context for this path:
         tk = tank.tank_from_path(new_path)
         ctx = tk.context_from_path(new_path, prev_context)
-    except tank.TankError, e:
+    except tank.TankError:
         try:
             # could not detect context from path, will use the project context
             # for menus if it exists
             ctx = engine.sgtk.context_from_entity_dictionary(engine.context.project)
             message = (
-                "Shotgun Substance Painter Engine could not detect "
-                "the context\n from the project loaded. "
-                "Shotgun menus will be reset \n"
-                "to the project '%s' "
-                "context."
-                "\n" % engine.context.project.get("name")
+                "Flow Production Tracking could not detect a context from the project path.\n"
+                "from the project loaded. FlowPTR menus will be reset\n"
+                "to the project '%s' context.\n"
+                % engine.context.project.get("name")
             )
             engine.show_warning(message)
 
-        except tank.TankError, e:
+        except tank.TankError:
             (exc_type, exc_value, exc_traceback) = sys.exc_info()
             message = ""
-            message += "Shotgun Substance Painter Engine cannot be started:.\n"
-            message += "Please contact support@shotgunsoftware.com\n\n"
+            message += "Flow Production Tracking engine cannot be started.\n"
+            message += "Please contact support\n\n"
             message += "Exception: %s - %s\n" % (exc_type, exc_value)
             message += "Traceback (most recent call last):\n"
             message += "\n".join(traceback.format_tb(exc_traceback))
@@ -158,14 +138,18 @@ def refresh_engine(scene_name, prev_context):
     if ctx != engine.context:
         engine.change_context(ctx)
 
-    # shotgun menu may have been removed,
+    # FlowPTR menu may have been removed,
     # so add it back in if its not already there.
     engine.create_shotgun_menu()
 
 
 class SubstancePainterEngine(Engine):
     """
-    Toolkit engine for Substance Painter.
+    The Flow Production Tracking Toolkit engine for Adobe Substance 3D Painter.
+
+    This engine is responsible for managing the communication with Substance 3D Painter,
+    bootstrapping the Toolkit environment, handling context changes, and displaying
+    Toolkit app UIs.
     """
 
     def __init__(self, *args, **kwargs):
@@ -182,7 +166,7 @@ class SubstancePainterEngine(Engine):
     @property
     def app(self):
         """
-        Represents the DDC app connection
+        A client object that provides an API for interacting with Substance 3D Painter.
         """
         return self._dcc_app
 
@@ -203,7 +187,7 @@ class SubstancePainterEngine(Engine):
             dlg = QtWidgets.QMessageBox(self._qt_app_central_widget)
             dlg.setIcon(level_icon[level])
             dlg.setText(msg)
-            dlg.setWindowTitle("Shotgun Substance Painter Engine")
+            dlg.setWindowTitle("FlowPTR Substance 3D Painter engine")
             dlg.setWindowFlags(dlg.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
             dlg.show()
             dlg.exec_()
@@ -250,7 +234,7 @@ class SubstancePainterEngine(Engine):
         This will affect all logging across all of toolkit.
         """
         self.logger.debug(
-            "calling substance painer with debug: %s" % LogManager().global_debug
+            "calling Substance 3D Painter with debug: %s" % LogManager().global_debug
         )
 
         # flip debug logging
@@ -276,7 +260,7 @@ class SubstancePainterEngine(Engine):
     def __register_open_log_folder_command(self):
         """
         # add a 'open log folder' command to the engine's context menu
-        # note: we make an exception for the shotgun engine which is a
+        # note: we make an exception for the FlowPTR engine which is a
         # special case.
         """
         if self.name != SHOTGUN_ENGINE_NAME:
@@ -323,13 +307,13 @@ class SubstancePainterEngine(Engine):
     @property
     def host_info(self):
         """
-        :returns: A dictionary with information about the application hosting 
+        :returns: A dictionary with information about the application hosting
                   his engine.
 
         The returned dictionary is of the following form on success:
 
             {
-                "name": "SubstancePainter",
+                "name": "Substance3DPainter",
                 "version": "2018.3.1",
             }
 
@@ -337,22 +321,27 @@ class SubstancePainterEngine(Engine):
         the version identification.
 
             {
-                "name": "SubstancePainter",
+                "name": "Substance3DPainter",
                 "version: "unknown"
             }
         """
 
-        host_info = {"name": "SubstancePainter", "version": "unknown"}
+        host_info = {"name": "Substance3DPainter", "version": "unknown"}
         try:
             painter_version = self._dcc_app.get_application_version()
             host_info["version"] = painter_version
-        except:
+        except Exception:
             pass
         return host_info
 
     def process_request(self, method, **kwargs):
         """
-        This method takes care of requests from the dcc app.
+        This method is the primary entry point for commands sent from the
+        QML plugin running inside Substance 3D Painter. It acts as a dispatcher,
+        routing requests to the appropriate engine methods.
+
+        :param str method: The name of the command to process.
+        :param dict kwargs: A dictionary of parameters for the command.
         """
         self.logger.info("process_request. method: %s | kwargs: %s" % (method, kwargs))
 
@@ -390,12 +379,20 @@ class SubstancePainterEngine(Engine):
                 fn(**kwargs)
 
     def register_event_callback(self, event_type, callback_fn):
+        """
+        Registers a callback function to be executed when a specific event
+        is received from Substance 3D Painter.
+        """
         if event_type not in self._event_callbacks:
             self._event_callbacks[event_type] = []
         self._event_callbacks[event_type].append(callback_fn)
 
     def unregister_event_callback(self, event_type, callback_fn):
+        """
+        Unregisters a previously registered event callback.
+        """
         if event_type not in self._event_callbacks:
+            # No callbacks registered for this event type, so nothing to do.
             return
 
         if callback_fn in self._event_callbacks[event_type]:
@@ -403,12 +400,14 @@ class SubstancePainterEngine(Engine):
 
     def pre_app_init(self):
         """
-        Initializes the Substance Painter engine.
+        Initializes the Substance 3D Painter engine.
+        This is called before any apps are initialized.
         """
 
         self.logger.debug("%s: Initializing...", self)
 
         self.tk_substancepainter = self.import_module("tk_substancepainter")
+        self.utils = self.tk_substancepainter.utils
 
         self.init_qt_app()
 
@@ -427,33 +426,32 @@ class SubstancePainterEngine(Engine):
                 "are Mac, Linux 64 and Windows 64."
             )
 
-        # default menu name is Shotgun but this can be overridden
+        # default menu name is FlowPTR but this can be overridden
         # in the configuration to be sgtk in case of conflicts
-        self._menu_name = "Shotgun"
+        self._menu_name = "Flow Production Tracking"
         if self.get_setting("use_sgtk_as_menu_name", False):
             self._menu_name = "Sgtk"
 
         painter_version_str = self._dcc_app.get_application_version()
 
-        # New version system was introduced in version 2020.1, that became
-        # version 6.1.0, so we need to do some magic to normalize versions.
-        # https://docs.substance3d.com/spdoc/version-2020-1-6-1-0-194216357.html
-        painter_version = to_normalized_version(painter_version_str)
-        painter_min_supported_version = to_normalized_version(MINIMUM_SUPPORTED_VERSION)
+        # Normalize the version strings for reliable comparison.
+        # This handles different versioning schemes used by Substance 3D Painter over the years.
+        painter_version = self.utils.to_normalized_version(painter_version_str)
+        painter_min_supported_version = self.utils.to_normalized_version(MINIMUM_SUPPORTED_VERSION)
 
         if painter_version < painter_min_supported_version:
             msg = (
-                "Shotgun integration is not compatible with Substance Painter versions"
+                "FlowPTR integration is not compatible with Substance 3D Painter versions"
                 " older than %s" % MINIMUM_SUPPORTED_VERSION
             )
             raise tank.TankError(msg)
 
         if painter_version > painter_min_supported_version:
-            # show a warning that this version of Substance Painter isn't yet fully tested
-            # with Shotgun:
+            # show a warning that this version of Substance 3D Painter isn't yet fully tested
+            # with Flow Production Tracking:
             msg = (
-                "The Shotgun Pipeline Toolkit has not yet been fully "
-                "tested with Substance Painter %s.  "
+                "The FlowPTR Pipeline Toolkit has not yet been fully "
+                "tested with Substance 3D Painter %s.  "
                 "You can continue to use Toolkit but you may experience "
                 "bugs or instability."
                 "\n\n" % (painter_version)
@@ -470,7 +468,7 @@ class SubstancePainterEngine(Engine):
                 # setting
                 min_version_str = self.get_setting("compatibility_dialog_min_version")
 
-                min_version = to_normalized_version(min_version_str)
+                min_version = self.utils.to_normalized_version(min_version_str)
                 if painter_version < min_version:
                     show_warning_dlg = False
 
@@ -489,7 +487,7 @@ class SubstancePainterEngine(Engine):
 
             if current_os.startswith("win"):
                 self.logger.debug(
-                    "Substance Painter on Windows can deadlock if QtWebEngineWidgets "
+                    "Substance 3D Painter on Windows can deadlock if QtWebEngineWidgets "
                     "is imported. Setting "
                     "SHOTGUN_SKIP_QTWEBENGINEWIDGETS_IMPORT=1..."
                 )
@@ -497,12 +495,12 @@ class SubstancePainterEngine(Engine):
 
     def create_shotgun_menu(self, disabled=False):
         """
-        Creates the main shotgun menu in substancepainter.
+        Creates the main Flow Production Tracking menu.
         Note that this only creates the menu, not the child actions
         :return: bool
         """
 
-        # only create the shotgun menu if not in batch mode and menu doesn't
+        # only create the FlowPTR menu if not in batch mode and menu doesn't
         # already exist
         if self.has_ui:
             # create our menu handler
@@ -518,7 +516,7 @@ class SubstancePainterEngine(Engine):
 
     def display_menu(self, pos=None):
         """
-        Shows the engine Shotgun menu.
+        Shows the engine's main menu at the given screen position.
         """
         if self._menu_generator:
             self._menu_generator.show(pos)
@@ -526,6 +524,10 @@ class SubstancePainterEngine(Engine):
     def init_qt_app(self):
         """
         Initializes if not done already the QT Application for the engine.
+
+        This method ensures that a QApplication instance exists, which is required
+        for displaying any Qt-based UIs from Toolkit apps. It also sets up a
+        main window to act as a parent for dialogs.
         """
         from sgtk.platform.qt5 import QtWidgets, QtGui
 
@@ -546,7 +548,9 @@ class SubstancePainterEngine(Engine):
 
     def post_app_init(self):
         """
-        Called when all apps have initialized
+        Called after all apps have been initialized.
+        This is where we create the main menu, run startup apps, and start the
+        main Qt event loop.
         """
 
         # for some reason this engine command get's lost so we add it back
@@ -555,7 +559,7 @@ class SubstancePainterEngine(Engine):
         # Run a series of app instance commands at startup.
         self._run_app_instance_commands()
 
-        # Create the shotgun menu
+        # Create the FlowPTR menu
         self.create_shotgun_menu()
 
         # Let the app know we are ready for action!
@@ -572,8 +576,8 @@ class SubstancePainterEngine(Engine):
 
     def post_context_change(self, old_context, new_context):
         """
-        Runs after a context change. The Substance Painter event watching will 
-        be stopped and new callbacks registered containing the new context 
+        Runs after a context change. The Substance 3D Painter event watching will
+        be stopped and new callbacks registered containing the new context
         information.
 
         :param old_context: The context being changed away from.
@@ -592,14 +596,14 @@ class SubstancePainterEngine(Engine):
 
     def _run_app_instance_commands(self):
         """
-        Runs the series of app instance commands listed in the 
+        Runs the series of app instance commands listed in the
         'run_at_startup' setting of the environment configuration yaml file.
         """
 
         # Build a dictionary mapping app instance names to dictionaries of
         # commands they registered with the engine.
         app_instance_commands = {}
-        for (cmd_name, value) in self.commands.iteritems():
+        for (cmd_name, value) in self.commands.items():
             app_instance = value["properties"].get("app")
             if app_instance:
                 # Add entry 'command name: command function' to the command
@@ -631,7 +635,7 @@ class SubstancePainterEngine(Engine):
             else:
                 if not setting_cmd_name:
                     # Run all commands of the given app instance.
-                    for (cmd_name, command_function) in cmd_dict.iteritems():
+                    for (cmd_name, command_function) in cmd_dict.items():
                         msg = (
                             "%s startup running app '%s' command '%s'.",
                             self.name,
@@ -669,7 +673,7 @@ class SubstancePainterEngine(Engine):
 
     def destroy_engine(self):
         """
-        Cleanup after ourselves
+        Called when the engine is being destroyed.
         """
         self.logger.debug("%s: Destroying...", self)
 
@@ -683,7 +687,7 @@ class SubstancePainterEngine(Engine):
     @property
     def has_ui(self):
         """
-        Detect and return if Substance Painter is running in batch mode
+        Detect and return if Substance 3D Painter is running in batch mode
         """
         return True
 
@@ -704,13 +708,13 @@ class SubstancePainterEngine(Engine):
         # where "basename" is the leaf part of the logging record name,
         # for example "tk-multi-shotgunpanel" or "qt_importer".
         if record.levelno < logging.INFO:
-            formatter = logging.Formatter("Debug: Shotgun %(basename)s: %(message)s")
+            formatter = logging.Formatter("Debug: Flow Production Tracking %(basename)s: %(message)s")
         else:
-            formatter = logging.Formatter("Shotgun %(basename)s: %(message)s")
+            formatter = logging.Formatter("Flow Production Tracking %(basename)s: %(message)s")
 
-        msg = formatter.format(record)
+        msg = formatter.format(record).replace("\n", "\n... ")
 
-        # Select Substance Painter display function to use according to the logging
+        # Select Substance 3D Painter display function to use according to the logging
         # record level.
         if record.levelno >= logging.ERROR:
             fct = display_error
@@ -721,7 +725,7 @@ class SubstancePainterEngine(Engine):
         else:
             fct = display_debug
 
-        # Display the message in Substance Painter script editor in a thread safe manner.
+        # Display the message in Substance 3D Painter script editor in a thread safe manner.
         self.async_execute_in_main_thread(fct, msg)
 
     def close_windows(self):
@@ -743,7 +747,7 @@ class SubstancePainterEngine(Engine):
                 # the original dialog list.
                 self.logger.debug("Closing dialog %s.", dialog_window_title)
                 dialog.close()
-            except Exception, exception:
+            except Exception as exception:
                 traceback.print_exc()
                 self.logger.error(
                     "Cannot close dialog %s: %s", dialog_window_title, exception

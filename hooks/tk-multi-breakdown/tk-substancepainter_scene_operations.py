@@ -8,34 +8,44 @@
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
+# Original code by: Diego Garcia Huerta, https://www.linkedin.com/in/diegogh/
+# Updated by: Stephen Studyvin
+
+# Updated:
+# September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
+
+# https://help.autodesk.com/view/SGDEV/ENU/
+
 import os
 
 import sgtk
-from sgtk.errors import TankError
-
 
 __author__ = "Diego Garcia Huerta"
 __contact__ = "https://www.linkedin.com/in/diegogh/"
 
-
 HookBaseClass = sgtk.get_hook_baseclass()
-
 
 RESOURCE_IN_USE_COLOR = "#e7a81d"
 RESOURCE_NOT_IN_USE_COLOR = "gray"
 
-
 class SubstancePainterResource(str):
     """
     Helper Class to store metadata per update item.
-
-    tk-multi-breakdown requires item['node'] to be a str. This is what is displayed in 
-    the list of recognized items to update. We want to add metadata to each item
-    as what we want to display as name is not the actual item to update.
-    In our case, we want to display the nguiname of the resrouce, color in green 
-    the items in used in the project, and also the resource id for reference.
-    As a str is required we are forced to inherit from str instead of the more
-    python friendly object + __repr__ magic method.
+    
+    The tk-multi-breakdown app requires that the 'node' key in each item dictionary
+    be a string, as this is what it displays in the UI list.
+    
+    However, we need to associate more complex data with each item (like the
+    resource URL, usage status, etc.) to perform the update correctly.
+    
+    This class is a workaround for that limitation. It inherits from `str`, so
+    it satisfies the breakdown app's requirement. The string value itself is
+    formatted with HTML to create a rich text display in the UI. We then attach
+    our custom metadata (`resource`, `in_use`, `nice_name`) as attributes directly
+    to the object instance.
+    
+    This allows us to pass complex data through the breakdown process while still
+    presenting a user-friendly string in the UI.
     """
 
     def __new__(cls, resource, in_use, nice_name):
@@ -58,24 +68,23 @@ class SubstancePainterResource(str):
 
 class BreakdownSceneOperations(HookBaseClass):
     """
-    Breakdown operations for Substance Painter.
+    Breakdown operations for Adobe Substance 3D Painter.
 
-    This implementation handles detection of Substance Painter resources, 
+    This implementation handles detection of Adobe Substance 3D Painter resources, 
     that have been loaded with the tk-multi-loader2 toolkit app.
     """
 
-    def _sort_by_used_and_nice_name(self, a, b):
-        # sort by use
-        if a["node"].in_use and not b["node"].in_use:
-            return -1
-
-        if not a["node"].in_use and b["node"].in_use:
-            return 1
-
-        # sort by version
-        return cmp(a["node"].resource["version"], b["node"].resource["version"])
-
     def _document_resources_by_version(self, engine):
+        """
+        Scans the current project for all resources that are actively in use
+        and returns a dictionary of them, keyed by their unique version ID.
+        
+        This provides a quick lookup to determine if a resource loaded via the
+        Loader is still being used in the project.
+        
+        :param engine: The current Toolkit engine instance.
+        :return: A dictionary of resource info dictionaries.
+        """
         resources_in_project = {}
 
         in_use_resources = engine.app.document_resources()
@@ -109,35 +118,35 @@ class BreakdownSceneOperations(HookBaseClass):
         date.
         """
 
-        # We find the resources to update by checking the tk-multi-loader
-        # project settings that the tk app have been setting as it was used
-        # to import resouces from published files.
-
-        # We identify resrouces to update by their unique id that is the
-        # resource version. At this stage it is not clear if this is a decent
-        # assumption or not, but found that the resource url would include
-        # something like project0 or project2, and the actual resource was
-        # the same, so needed to find an alternative as a unique id for the
-        # resource.
-
         refs = []
         engine = sgtk.platform.current_engine()
 
+        # First, get a list of all resources currently being used in the project.
+        # We key this by a unique version identifier for fast lookups.
         resources_in_project = self._document_resources_by_version(engine)
+
+        # Next, get the list of all resources that have been imported into this
+        # project via the tk-multi-loader2 app. This data is stored in the
+        # project's metadata. This gives us a list of what *should* be in the scene.
         resources = engine.app.get_project_settings("tk-multi-loader2") or {}
 
+        # Now, iterate through all the resources that were loaded via the Loader.
         for url in resources.keys():
             res_info = engine.app.get_resource_info(url)
 
             if res_info:
+                # For each loaded resource, check if it's still in our dictionary
+                # of actively used resources. This tells us if it's "Used" or "Not Used".
                 in_use = res_info["version"] in resources_in_project
                 nice_name = res_info["guiName"]
 
+                # The path stored in the project settings is the original publish path.
+                # This is what the Breakdown app will use to check for new versions.
                 ref_path = resources[url]
                 ref_path = ref_path.replace("/", os.path.sep)
 
-                # see SubstancePainterResource for explanation why we use
-                # a custom class
+                # Create our custom string object to hold all the necessary data.
+                # This will be displayed in the UI and passed to the update method.
                 refs.append(
                     {
                         "type": "file",
@@ -147,8 +156,11 @@ class BreakdownSceneOperations(HookBaseClass):
                 )
 
         if refs:
-            refs.sort(self._sort_by_used_and_nice_name)
+            # Sort the list to show "Used" items first, then sort by version.
+            # The `not item["node"].in_use` trick sorts boolean False (is in use) before True.
+            refs.sort(key=lambda item: (not item["node"].in_use, item["node"].resource["version"]))
 
+        self.parent.log_debug("Scanned scene and found %d references." % len(refs))
         return refs
 
     def update(self, items):
@@ -166,24 +178,31 @@ class BreakdownSceneOperations(HookBaseClass):
 
         engine = sgtk.platform.current_engine()
 
+        # Get an up-to-date list of resources in the project before we start updating.
         resources_in_project = self._document_resources_by_version(engine)
 
         for i in items:
+            # The 'node' is our custom SubstancePainterResource object.
             node = i["node"]
             node_type = i["type"]
+            # The 'path' is the new path to the latest version of the publish.
             new_path = i["path"]
 
             if node_type == "file":
-                # here we identify from the existing resources in the scene
-                # which one is the one to update. We identify it by the version
-                # which acts as a unique id per resource.
+                # Extract the original resource info from our custom node object.
                 res_info = node.resource
+
+                # Double-check that the resource we want to update still exists in the project.
                 if res_info["version"] in resources_in_project:
                     res_info = resources_in_project[res_info["version"]]
 
+                # This is the unique URL of the old resource we want to replace.
                 url = res_info["url"]
 
+                # A resource can have multiple usages (e.g., basecolor, normal).
+                # We need to re-import the new file for each of its original usages.
                 for usage in res_info["usages"]:
+                    # 1. Import the new file from `new_path` as a new resource.
                     new_url = engine.app.import_project_resource(
                         new_path, usage, "Shotgun"
                     )
@@ -192,6 +211,7 @@ class BreakdownSceneOperations(HookBaseClass):
                     engine.log_debug("Existing resource url: %s" % url)
                     engine.log_debug("New resource url: %s" % new_url)
 
+                    # 2. Tell Substance 3D Painter to replace all instances of the old resource with the new one.
                     engine.app.update_document_resources(url, new_url)
 
                     engine.log_debug("Updated usage: %s" % usage)

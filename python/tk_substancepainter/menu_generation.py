@@ -9,7 +9,13 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 """
-Menu handling for Substnace Painter
+Menu handling for Adobe Substance 3D Painter
+
+Original code by: Diego Garcia Huerta
+Updated by: Stephen Studyvin
+
+Updated:
+September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
 
 """
 
@@ -18,42 +24,53 @@ import sys
 import os
 import unicodedata
 
-
 __author__ = "Diego Garcia Huerta"
 __email__ = "diegogh2000@gmail.com"
-
 
 from tank.platform.qt5 import QtWidgets, QtGui, QtCore, QtWebSockets, QtNetwork
 
 
 class MenuGenerator(object):
     """
-    Menu generation functionality.
+    Handles the creation, display, and management of the Flow Production Tracking
+    (FlowPTR) menu within Adobe Substance 3D Painter.
+
+    This class builds a QMenu based on the commands registered with the engine,
+    including context information, favorites, and commands grouped by app.
     """
 
     def __init__(self, engine, menu_name):
+        # Initializes the menu generator.
         self._engine = engine
         self._menu_name = menu_name
         self._dialogs = []
-
         self._widget = QtWidgets.QWidget()
         self._handle = QtWidgets.QMenu(self._menu_name, self._widget)
         self._ui_cache = []
 
     @property
     def menu_handle(self):
+        # The main QMenu object that is being managed.
         return self._handle
 
     def hide(self):
+        # Hides the menu.
         self.menu_handle.hide()
 
     def show(self, pos=None):
+        """
+        Shows the menu at the given position, or at the current cursor position
+        if no position is provided.
+
+        :param pos: A list or tuple [x, y] with the screen coordinates.
+        """
         pos = QtGui.QCursor.pos() if pos is None else QtCore.QPoint(pos[0], pos[1])
         qApp = QtWidgets.QApplication.instance()
-        # qApp.setWindowState(QtCore.Qt.WindowActive)
 
+        # Ensure the menu window is active and on top before showing it.
         self.menu_handle.activateWindow()
         self.menu_handle.raise_()
+        # exec_ shows the menu as a modal dialog, waiting for user interaction.
         self.menu_handle.exec_(pos)
 
     def create_menu(self, disabled=False):
@@ -65,6 +82,7 @@ class MenuGenerator(object):
 
         self.menu_handle.clear()
 
+        # If the engine is disabled, show a simple message and stop.
         if disabled:
             self.menu_handle.addMenu("Sgtk is disabled.")
             return
@@ -85,27 +103,44 @@ class MenuGenerator(object):
 
         # now add favourites
         for fav in self._engine.get_setting("menu_favourites"):
-            app_instance_name = fav["app_instance"]
-            menu_name = fav["name"]
-
-            # scan through all menu items
-            for cmd in menu_items:
-                if (
-                    cmd.get_app_instance_name() == app_instance_name
-                    and cmd.name == menu_name
-                ):
-                    # found our match!
-                    cmd.add_command_to_menu(self.menu_handle)
-                    # mark as a favourite item
-                    cmd.favourite = True
+            self._add_favourite(fav, menu_items)
 
         # add menu divider
         self._add_divider(self.menu_handle)
 
-        # now go through all of the menu items.
-        # separate them out into various sections
-        commands_by_app = {}
+        # now add all apps to main menu
+        self._add_app_menus(menu_items)
 
+        # add a final menu item to close the menu
+        self._add_divider(self.menu_handle)
+        self._add_menu_item("-- Exit Menu --", self.menu_handle, self.menu_handle.hide)
+
+    def _add_favourite(self, fav, menu_items):
+        """
+        Finds a command specified in the 'menu_favourites' setting and adds it
+        directly to the top level of the menu.
+        """
+        app_instance_name = fav["app_instance"]
+        menu_name = fav["name"]
+
+        # scan through all menu items
+        for cmd in menu_items:
+            if (
+                cmd.get_app_instance_name() == app_instance_name
+                and cmd.name == menu_name
+            ):
+                # found our match!
+                cmd.add_command_to_menu(self.menu_handle)
+                # mark as a favourite item
+                cmd.favourite = True
+
+    def _add_app_menus(self, menu_items):
+        """
+        Organizes all commands by their parent app and adds them to the menu.
+        - Commands with a 'context_menu' type are added to the context sub-menu.
+        - Other commands are grouped into a dictionary by app name.
+        """
+        commands_by_app = {}
         for cmd in menu_items:
             if cmd.get_type() == "context_menu":
                 # context menu!
@@ -121,27 +156,23 @@ class MenuGenerator(object):
                     commands_by_app[app_name] = []
                 commands_by_app[app_name].append(cmd)
 
-        # now add all apps to main menu
-        self._add_app_menu(commands_by_app)
-
-        # add menu divider
-        self._add_divider(self.menu_handle)
-
-        # add menu divider
-        self._add_menu_item("-- Exit Menu --", self.menu_handle, self.menu_handle.hide)
+        self._add_commands_by_app_to_menu(commands_by_app)
 
     def _add_divider(self, parent_menu):
+        """Adds a separator line to a QMenu."""
         divider = QtWidgets.QAction(parent_menu)
         divider.setSeparator(True)
         parent_menu.addAction(divider)
         return divider
 
     def _add_sub_menu(self, menu_name, parent_menu):
+        """Adds a new sub-menu to a parent QMenu."""
         sub_menu = QtWidgets.QMenu(title=menu_name, parent=parent_menu)
         parent_menu.addMenu(sub_menu)
         return sub_menu
 
     def _add_menu_item(self, name, parent_menu, callback, properties=None):
+        """Adds a single action item to a QMenu."""
         action = QtWidgets.QAction(name, parent_menu)
         parent_menu.addAction(action)
         action.triggered.connect(callback)
@@ -157,19 +188,22 @@ class MenuGenerator(object):
 
     def _add_context_menu(self):
         """
-        Adds a context menu which displays the current context
+        Adds the top-level context menu. This menu displays the current Toolkit
+        context and provides actions like "Jump to Flow Production Tracking" and
+        "Jump to File System".
         """
 
         ctx = self._engine.context
         ctx_name = str(ctx)
 
         # create the menu object
-        # the label expects a unicode object so we cast it to support when the
-        # context may contain info with non-ascii characters
+        # The default menu name is defined in the engine constructor.
+        # It can be configured via the 'use_sgtk_as_menu_name' setting in info.yml
+        # to use 'Sgtk' instead of the default 'Flow Production Tracking'.
 
         ctx_menu = self._add_sub_menu(ctx_name, self.menu_handle)
 
-        self._add_menu_item("Jump to Shotgun", ctx_menu, self._jump_to_sg)
+        self._add_menu_item("Jump to Flow Production Tracking", ctx_menu, self._jump_to_sg)
 
         # Add the menu item only when there are some file system locations.
         if ctx.filesystem_locations:
@@ -182,39 +216,30 @@ class MenuGenerator(object):
 
     def _jump_to_sg(self):
         """
-        Jump to shotgun, launch web browser
+        Callback to launch a web browser and navigate to the current context's
+        URL in Flow Production Tracking.
         """
         url = self._engine.context.shotgun_url
         QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
     def _jump_to_fs(self):
         """
-        Jump from context to FS
+        Callback to open the file system browser to the context's locations on disk.
         """
         # launch one window for each location on disk
         paths = self._engine.context.filesystem_locations
-        for disk_location in paths:
+        for path in paths:
+            url = QtCore.QUrl.fromLocalFile(path)
+            if not QtGui.QDesktopServices.openUrl(url):
+                self._engine.logger.error("Failed to open folder: %s", path)
 
-            # get the setting
-            system = sys.platform
 
-            # run the app
-            if system == "linux2":
-                cmd = 'xdg-open "%s"' % disk_location
-            elif system == "darwin":
-                cmd = 'open "%s"' % disk_location
-            elif system == "win32":
-                cmd = 'cmd.exe /C start "Folder" "%s"' % disk_location
-            else:
-                raise Exception("Platform '%s' is not supported." % system)
-
-            exit_code = os.system(cmd)
-            if exit_code != 0:
-                self._engine.logger.error("Failed to launch '%s'!", cmd)
-
-    def _add_app_menu(self, commands_by_app):
+    def _add_commands_by_app_to_menu(self, commands_by_app):
         """
-        Add all apps to the main menu, process them one by one.
+        Iterates over the commands grouped by app and adds them to the menu.
+
+        - If an app has multiple commands, a sub-menu is created for it.
+        - If an app has only one command, it's added directly to the main menu.
         """
         for app_name in sorted(commands_by_app.keys()):
             if len(commands_by_app[app_name]) > 1:
@@ -242,7 +267,10 @@ class MenuGenerator(object):
 
 class AppCommand(object):
     """
-    Wraps around a single command that you get from engine.commands
+    A wrapper class for a single command dictionary from `engine.commands`.
+
+    This makes it easier to access command properties and provides helper methods
+    for interacting with the command's associated app and metadata.
     """
 
     def __init__(self, name, parent, command_dict):
@@ -254,7 +282,7 @@ class AppCommand(object):
 
     def get_app_name(self):
         """
-        Returns the name of the app that this command belongs to
+        Returns the display name of the app that this command belongs to.
         """
         if "app" in self.properties:
             return self.properties["app"].display_name
@@ -280,29 +308,24 @@ class AppCommand(object):
 
     def get_documentation_url_str(self):
         """
-        Returns the documentation as a str
+        Returns the documentation URL for the associated app as a string.
         """
         if "app" in self.properties:
             app = self.properties["app"]
-            doc_url = app.documentation_url
-            # deal with nuke's inability to handle unicode. #fail
-            if doc_url.__class__ == unicode:
-                doc_url = unicodedata.normalize("NFKD", doc_url).encode(
-                    "ascii", "ignore"
-                )
-            return doc_url
-
+            return app.documentation_url
         return None
 
     def get_type(self):
         """
-        returns the command type. Returns node, custom_pane or default
+        Returns the command type, e.g., 'context_menu' or 'default'.
         """
         return self.properties.get("type", "default")
 
     def add_command_to_menu(self, menu):
         """
-        Adds an app command to the menu
+        Adds this app command to the given QMenu.
+
+        It supports creating nested sub-menus if the command name contains '/'.
         """
 
         # create menu sub-tree if need to:
@@ -319,14 +342,14 @@ class AppCommand(object):
             else:
                 parent_menu = self.parent._add_sub_menu(item_label, parent_menu)
 
-        # self._execute_deferred)
+        # Add the final action to the determined parent menu.
         self.parent._add_menu_item(
             parts[-1], parent_menu, self.callback, self.properties
         )
 
     def _find_sub_menu_item(self, menu, label):
         """
-        Find the 'sub-menu' menu item with the given label
+        Helper to find an existing sub-menu QAction within a parent menu by its label.
         """
         for action in menu.actions():
             if action.text() == label:

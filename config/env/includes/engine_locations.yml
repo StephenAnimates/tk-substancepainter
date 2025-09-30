@@ -17,11 +17,11 @@
 # These are the additions to get substancepainter engine up and running with the 
 # default tk-apps
 
-
 # substancepainter
 # Make sure to check for latest versions of the engine here and update the
 # version section of the git description below accordingly.
 # https://github.com/StephenAnimates/tk-substancepainter/releases
+
 engines.tk-substancepainter.location:
   type: git
   path: https://github.com/StephenAnimates/tk-substancepainter

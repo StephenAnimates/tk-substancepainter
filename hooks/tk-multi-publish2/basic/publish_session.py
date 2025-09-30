@@ -8,15 +8,22 @@
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
+# Original code by: Diego Garcia Huerta, https://www.linkedin.com/in/diegogh/
+# Updated by: Stephen Studyvin
+
+# Updated:
+# September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
+
 import os
 
 import sgtk
-from sgtk.util.filesystem import ensure_folder_exists
 
 
 __author__ = "Diego Garcia Huerta"
 __contact__ = "https://www.linkedin.com/in/diegogh/"
 
+# Import the shared hook utility functions.
+utils = sgtk.platform.current_engine().import_module("tk_substancepainter.utils")
 
 HookBaseClass = sgtk.get_hook_baseclass()
 
@@ -42,11 +49,11 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
         contain simple html for formatting.
         """
 
-        loader_url = "https://support.shotgunsoftware.com/hc/en-us/articles/219033078"
+        loader_url = "https://help.autodesk.com/view/SGDEV/ENU/?guid=SG_Supervisor_Artist_sa_integrations_sa_integrations_user_guide_html#the-loader"
 
         return """
-        Publishes the file to Shotgun. A <b>Publish</b> entry will be
-        created in Shotgun which will include a reference to the file's current
+        Publishes the file to Flow Production Tracking. A <b>Publish</b> entry will be
+        created in FlowPTR which will include a reference to the file's current
         path on disk. If a publish template is configured, a copy of the
         current session will be copied to the publish template path which
         will be the file that is published. Other users will be able to access
@@ -60,8 +67,8 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
         If the filename contains a version number, the process will bump the
         file to the next version after publishing.
 
-        The <code>version</code> field of the resulting <b>Publish</b> in
-        Shotgun will also reflect the version number identified in the filename
+        The <code>version</code> field of the resulting <b>Publish</b> in FlowPTR
+        will also reflect the version number identified in the filename.
         The basic worklfow recognizes the following version formats by default:
 
         <ul>
@@ -85,7 +92,7 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
 
         <h3>Overwriting an existing publish</h3>
         In non-template workflows, a file can be published multiple times,
-        however only the most recent publish will be available to other users.
+        however, only the most recent publish will be available to other users.
         Warnings will be provided during validation if there are previous
         publishes.
         """ % (
@@ -113,7 +120,7 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
         """
 
         # inherit the settings from the base publish plugin
-        base_settings = super(SubstancePainterSessionPublishPlugin, self).settings or {}
+        base_settings = super().settings or {}
 
         # settings specific to this class
         substancepainter_publish_settings = {
@@ -174,7 +181,7 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
         if settings.get("Publish Template").value:
             item.context_change_allowed = False
 
-        path = _session_path()
+        path = utils.get_session_path()
 
         if not path:
             # the session has not been saved before (no path determined).
@@ -182,7 +189,7 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
             # validation will succeed.
             self.logger.warn(
                 "The Substance Painter session has not been saved.",
-                extra=_get_save_as_action(),
+                extra=utils.get_save_as_action(),
             )
 
         self.logger.info(
@@ -203,7 +210,7 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
         """
 
         publisher = self.parent
-        path = _session_path()
+        path = utils.get_session_path()
 
         # ---- ensure the session has been saved
 
@@ -211,7 +218,7 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
             # the session still requires saving. provide a save button.
             # validation fails.
             error_msg = "The Substance Painter session has not been saved."
-            self.logger.error(error_msg, extra=_get_save_as_action())
+            self.logger.error(error_msg, extra=utils.get_save_as_action())
             raise Exception(error_msg)
 
         # ---- check the session against any attached work template
@@ -225,6 +232,8 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
         # matches. if not, warn the user and provide a way to save the file to
         # a different path
         work_template = item.properties.get("work_template")
+        save_as_action = utils.get_save_as_action()
+
         if work_template:
             if not work_template.validate(path):
                 self.logger.warning(
@@ -232,11 +241,9 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
                     "file template.",
                     extra={
                         "action_button": {
-                            "label": "Save File",
-                            "tooltip": "Save the current session to a "
-                            "different file name",
-                            # will launch wf2 if configured
-                            "callback": _get_save_as_action(),
+                            "label": save_as_action["action_button"]["label"],
+                            "tooltip": save_as_action["action_button"]["tooltip"],
+                            "callback": save_as_action["action_button"]["callback"],
                         }
                     },
                 )
@@ -268,7 +275,7 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
                         "label": "Save to v%s" % (version,),
                         "tooltip": "Save to the next available version number, "
                         "v%s" % (version,),
-                        "callback": lambda: _save_session(next_version_path),
+                        "callback": lambda: utils.save_session(next_version_path),
                     }
                 },
             )
@@ -306,10 +313,10 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
 
         # get the path in a normalized state. no trailing separator, separators
         # are appropriate for current os, no double separators, etc.
-        path = sgtk.util.ShotgunPath.normalize(_session_path())
+        path = sgtk.util.ShotgunPath.normalize(utils.get_session_path())
 
         # ensure the session is saved
-        _save_session(path)
+        utils.save_session(path)
 
         # update the item with the saved session path
         item.properties["path"] = path
@@ -340,7 +347,7 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
         super(SubstancePainterSessionPublishPlugin, self).finalize(settings, item)
 
         # bump the session file to the next version
-        self._save_to_next_version(item.properties["path"], item, _save_session)
+        self._save_to_next_version(item.properties["path"], item, utils.save_session)
 
 
 def _substancepainter_find_additional_session_dependencies():
@@ -349,62 +356,3 @@ def _substancepainter_find_additional_session_dependencies():
     """
 
     return []
-
-
-def _session_path():
-    """
-    Return the path to the current session
-    :return:
-    """
-    engine = sgtk.platform.current_engine()
-
-    # get the path to the current file
-    path = engine.app.get_current_project_path()
-
-    if isinstance(path, unicode):
-        path = path.encode("utf-8")
-
-    return path
-
-
-def _save_session(path):
-    """
-    Save the current session to the supplied path.
-    """
-
-    # Ensure that the folder is created when saving
-    folder = os.path.dirname(path)
-    ensure_folder_exists(folder)
-
-    engine = sgtk.platform.current_engine()
-    engine.app.save_project_as(path)
-
-
-# TODO: method duplicated in all the Substance Painter hooks
-def _get_save_as_action():
-    """
-    Simple helper for returning a log action dict for saving the session
-    """
-
-    engine = sgtk.platform.current_engine()
-
-    callback = _save_as
-
-    # if workfiles2 is configured, use that for file save
-    if "tk-multi-workfiles2" in engine.apps:
-        app = engine.apps["tk-multi-workfiles2"]
-        if hasattr(app, "show_file_save_dlg"):
-            callback = app.show_file_save_dlg
-
-    return {
-        "action_button": {
-            "label": "Save As...",
-            "tooltip": "Save the current session",
-            "callback": callback,
-        }
-    }
-
-
-def _save_as():
-    engine = sgtk.platform.current_engine()
-    engine.save_project_as_action()

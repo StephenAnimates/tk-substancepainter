@@ -8,24 +8,35 @@
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
+# Original code by: Diego Garcia Huerta, https://www.linkedin.com/in/diegogh/
+# Updated by: Stephen Studyvin
+
+# Updated:
+# September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
+
+# https://help.autodesk.com/view/SGDEV/ENU/
+
 import os
 import sys
 import shutil
 import hashlib
 import socket
-from distutils.version import LooseVersion
 
 ##############
 
 import sgtk
 from sgtk.platform import SoftwareLauncher, SoftwareVersion, LaunchInformation
 
+# Since this file is loaded by the Toolkit bootstrap process, we can't directly
+# import from the engine's python folder. We add it to the path temporarily.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "python"))
+from tk_substancepainter import utils
+sys.path.pop(0)
 
 __author__ = "Diego Garcia Huerta"
 __contact__ = "https://www.linkedin.com/in/diegogh/"
 
 logger = sgtk.LogManager.get_logger(__name__)
-
 
 # We use this to indicate that we could not retrieve the version for the
 # binary/executable, so we allow the engine to run with it
@@ -34,72 +45,55 @@ UNKNOWN_VERSION = "UNKNOWN_VERSION"
 # note that this is the same in engine.py
 MINIMUM_SUPPORTED_VERSION = "2018.3"
 
-
-def to_normalized_version(version):
-    """
-    Converts a version string into a new style version.
-
-    - Old versions (e.g., "2.6.2") are left as is.
-    - Year-based versions (e.g., "2018.3.1") are converted to a major
-      version number by subtracting 2014. For example, "2018.3.1" becomes "4.3.1".
-      This was the scheme introduced in 2017.1 (which became 3.1).
-    - Modern semantic versions (e.g., "6.1.0", "11.0.3") are left as is.
-
-    https://docs.substance3d.com/spdoc/version-2020-1-6-1-0-194216357.html
-    https://docs.substance3d.com/spdoc/all-changes-188973073.html
-
-    :param version: Version string to normalize.
-    :returns: A `distutils.version.LooseVersion` object.
-    """
-
-    version = LooseVersion(str(version))
-
-    # The year-based versions started with 2017 and had a major version > 2000.
-    # Modern versions (6.x, 11.x) have a much smaller major version.
-    if version.version[0] >= 2017:
-        version.version[0] -= 2014
-    return version
-
-
 # adapted from:
 # https://stackoverflow.com/questions/2270345/finding-the-version-of-an-application-from-python
-def get_file_info(filename, info):
-    """
-    Extract information from a file.
-    """
-    import array
-    from ctypes import windll, create_string_buffer, c_uint, string_at, byref
+if sys.platform == "win32":
+    def get_file_info(filename, info):
+        """
+        Extracts a specific information string from a Windows executable's
+        version info resource.
 
-    # Get size needed for buffer (0 if no info)
-    size = windll.version.GetFileVersionInfoSizeA(filename, None)
-    # If no info in file -> empty string
-    if not size:
-        return ""
+        :param str filename: The path to the executable.
+        :param str info: The name of the info field to extract (e.g., "FileVersion").
+        :return: The value of the info field, or an empty string if not found.
+        """
+        from ctypes import windll, create_unicode_buffer, c_uint, byref, cast, POINTER
 
-    # Create buffer
-    res = create_string_buffer(size)
-    # Load file informations into buffer res
-    windll.version.GetFileVersionInfoA(filename, None, size, res)
-    r = c_uint()
-    l = c_uint()
-    # Look for codepages
-    windll.version.VerQueryValueA(res, "\\VarFileInfo\\Translation", byref(r), byref(l))
-    # If no codepage -> empty string
-    if not l.value:
-        return ""
+        # Get the size of the version info block.
+        size = windll.version.GetFileVersionInfoSizeW(filename, None)
+        if not size:
+            return ""
 
-    # Take the first codepage (what else ?)
-    codepages = array.array("H", string_at(r.value, l.value))
-    codepage = tuple(codepages[:2].tolist())
+        # Create a buffer and load the version info into it.
+        res = create_unicode_buffer(size)
+        if not windll.version.GetFileVersionInfoW(filename, None, size, res):
+            return ""
 
-    # Extract information
-    windll.version.VerQueryValueA(
-        res, ("\\StringFileInfo\\%04x%04x\\" + info) % codepage, byref(r), byref(l)
-    )
-    return string_at(r.value, l.value)
+        # Find the language and codepage of the version info.
+        r = c_uint()
+        l = c_uint()
+        if not windll.version.VerQueryValueW(res, u"\\VarFileInfo\\Translation", byref(r), byref(l)):
+            return ""
+        if not l.value:
+            return ""
+
+        # Codepages are returned as a pointer to an array of words.
+        codepages = cast(r, POINTER(c_uint)).contents
+        codepage = (codepages.value & 0xFFFF, codepages.value >> 16)
+
+        # Construct the query string and extract the requested information.
+        query = u"\\StringFileInfo\\%04x%04x\\%s" % (codepage[0], codepage[1], info)
+        if not windll.version.VerQueryValueW(res, query, byref(r), byref(l)):
+            return ""
+
+        return cast(r, POINTER(c_uint * l.value)).contents.value
 
 
 def md5(fname):
+    """
+    Calculates the MD5 checksum of a file.
+    Used to reliably check if two files are identical.
+    """
     hash_md5 = hashlib.md5()
     with open(fname, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
@@ -108,12 +102,18 @@ def md5(fname):
 
 
 def samefile(file1, file2):
+    """Checks if two files are identical by comparing their MD5 hashes."""
     return md5(file1) == md5(file2)
 
 
 # based on:
 # https://stackoverflow.com/questions/38876945/copying-and-merging-directories-excluding-certain-extensions
 def copytree_multi(src, dst, symlinks=False, ignore=None):
+    """
+    Recursively copies a directory tree, similar to shutil.copytree, but with
+    a key difference: it overwrites files in the destination only if they are
+    different from the source file (checked via MD5 hash).
+    """
     names = os.listdir(src)
     if ignore is not None:
         ignored_names = ignore(src, names)
@@ -154,15 +154,18 @@ def copytree_multi(src, dst, symlinks=False, ignore=None):
             errors.extend(err.args[0])
     try:
         shutil.copystat(src, dst)
-    except WindowsError:
+    except OSError:
         pass
     except OSError as why:
         errors.extend((src, dst, str(why)))
     if errors:
         raise shutil.Error(errors)
 
-
 def ensure_scripts_up_to_date(engine_scripts_path, scripts_folder):
+    """
+    Ensures that the QML plugin scripts in the user's Substance 3D Painter
+    plugins directory are up-to-date with the ones bundled in the engine.
+    """
     logger.info("Updating scripts...: %s" % engine_scripts_path)
     logger.info("                     scripts_folder: %s" % scripts_folder)
 
@@ -170,8 +173,8 @@ def ensure_scripts_up_to_date(engine_scripts_path, scripts_folder):
 
     return True
 
-
 def get_free_port():
+    """Finds and returns an available TCP port on the local machine."""
     # Ask the OS to allocate a port.
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
@@ -179,6 +182,26 @@ def get_free_port():
     sock.close()
     return port
 
+def _get_python_executable(app_path):
+    """
+    Returns the path to the Python executable that ships with Substance 3D Painter.
+
+    :param str app_path: The path to the main application.
+    :return: The path to the python executable.
+    """
+    python_exe_path = None
+
+    if sys.platform == "win32":
+        # e.g. C:/Program Files/Adobe/Adobe Substance 3D Painter/python/python.exe
+        python_exe_path = os.path.join(os.path.dirname(app_path), "python", "python.exe")
+    elif sys.platform == "darwin":
+        # e.g. /Applications/Adobe Substance 3D Painter/Adobe Substance 3D Painter.app/Contents/MacOS/python/bin/python3
+        python_exe_path = os.path.join(app_path, "Contents", "MacOS", "python", "bin", "python3")
+    elif sys.platform.startswith("linux"):
+        # e.g. /opt/Adobe/Adobe_Substance_3D_Painter/python/bin/python3
+        python_exe_path = os.path.join(os.path.dirname(app_path), "python", "bin", "python3")
+
+    return python_exe_path
 
 class SubstancePainterLauncher(SoftwareLauncher):
     """
@@ -192,7 +215,7 @@ class SubstancePainterLauncher(SoftwareLauncher):
     # strings, these allow us to alter the regex matching for any of the
     # variable components of the path in one place.
 
-    # It seems that Substance Painter does not use any version number in the
+    # It seems that Substance 3D Painter does not use any version number in the
     # installation folders.
     COMPONENT_REGEX_LOOKUP = {}
 
@@ -204,7 +227,7 @@ class SubstancePainterLauncher(SoftwareLauncher):
     EXECUTABLE_TEMPLATES = {
         "darwin": ["/Applications/Adobe Substance 3D Painter/Adobe Substance 3D Painter.app", "/Applications/Allegorithmic/Substance Painter.app"],
         "win32": ["C:/Program Files/Adobe/Adobe Substance 3D Painter/Adobe Substance 3D Painter.exe", "C:/Program Files/Allegorithmic/Substance Painter/Substance Painter.exe"],
-        "linux2": [
+        "linux": [
             "/opt/Adobe/Adobe_Substance_3D_Painter/Adobe_Substance_3D_Painter",
             "/usr/Allegorithmic/Substance Painter",
             "/usr/Allegorithmic/Substance_Painter/Substance Painter",
@@ -221,10 +244,10 @@ class SubstancePainterLauncher(SoftwareLauncher):
 
     def prepare_launch(self, exec_path, args, file_to_open=None):
         """
-        Prepares an environment to launch SubstancePainter in that will automatically
-        load Toolkit and the tk-substancepainter engine when SubstancePainter starts.
+        Prepares an environment to launch Substance 3D Painter in that will automatically
+        load Toolkit and the tk-substancepainter engine when Substance 3D Painter starts.
 
-        :param str exec_path: Path to SubstancePainter executable to launch.
+        :param str exec_path: Path to Substance 3D Painter executable to launch.
         :param str args: Command line arguments as strings.
         :param str file_to_open: (optional) Full path name of a file to open on
                                             launch.
@@ -233,11 +256,10 @@ class SubstancePainterLauncher(SoftwareLauncher):
         required_env = {}
 
         resources_plugins_path = os.path.join(self.disk_location, "resources", "plugins")
-
-        # Run the engine's init.py file when SubstancePainter starts up
-        # TODO, maybe start engine here
         startup_path = os.path.join(self.disk_location, "startup", "bootstrap.py")
 
+        # The classic bootstrap approach involves setting environment variables
+        # that the QML plugin will use to launch the Python engine process.
         # Prepare the launch environment with variables required by the
         # classic bootstrap approach.
         self.logger.debug(
@@ -246,73 +268,95 @@ class SubstancePainterLauncher(SoftwareLauncher):
 
         required_env["SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP"] = startup_path.replace("\\", "/")
 
-        required_env["SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON"] = sys.executable.replace("\\", "/")
+        # Use the Python executable that is bundled with Substance 3D Painter.
+        # This ensures access to its PySide2 and native API without needing
+        # an external framework.
+        python_path = _get_python_executable(exec_path)
+        self.logger.info("Using Substance 3D Painter's Python: %s" % python_path)
+        required_env["SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON"] = python_path.replace("\\", "/")
 
         required_env["SGTK_SUBSTANCEPAINTER_SGTK_MODULE_PATH"] = sgtk.get_sgtk_module_path()
 
         required_env["SGTK_SUBSTANCEPAINTER_ENGINE_PORT"] = str(get_free_port())
 
+        # Pass the file to open to the engine via an environment variable.
         if file_to_open:
-            # Add the file name to open to the launch environment
             required_env["SGTK_FILE_TO_OPEN"] = file_to_open
 
-        # First big disclaimer: qml does not support environment variables for safety reasons
-        # the only way to pass information inside substance painter is to actually encode
-        # as a string and trick the program to think it is opening a substance painter project
-        # The reason why this works is because inside substance painter the original file is
-        # used with an URL, ie. //file/serve/filename, so we add to the URL using & to pass
-        # our now fake environment variables.
-        # Only the startup script, the location of python and potentially the file to open
-        # are needed.
+        # No special command-line arguments are needed for Substance 3D Painter.
+        # All bootstrap information is passed via environment variables.
         args = ""
-        args = ["%s=%s" % (k, v) for k, v in required_env.iteritems()]
-        args = '"&%s"' % "&".join(args)
-        logger.info("running %s" % args)
 
         required_env["SGTK_ENGINE"] = self.engine_name
         required_env["SGTK_CONTEXT"] = sgtk.context.serialize(self.context)
 
-        # ensure scripts are up to date on the substance painter side
+        # Ensure the QML plugin scripts are copied to the correct user directory.
+        user_scripts_path = self._get_user_plugin_path()
+        ensure_scripts_up_to_date(resources_plugins_path, user_scripts_path)
 
-        # Platform-specific plug-in paths
+        return LaunchInformation(exec_path, args, required_env)
 
+    def _get_icon(self, exec_path):
+        """
+        Find the icon for the application.
+
+        :param str exec_path: Path to the executable.
+        :returns: Full path to application icon as a string or None.
+        """
+        icon_path = None
+
+        if sys.platform == "darwin":
+            # The user-provided path for the icon on macOS.
+            # The executable path is the .app bundle itself.
+            icon_path = os.path.join(exec_path, "Contents", "Resources", "painter.icns")
+
+        elif sys.platform == "win32":
+            # On Windows, the icon is typically embedded in the executable.
+            # We can just return the path to the executable and the OS will handle it.
+            icon_path = exec_path
+
+        elif sys.platform.startswith("linux"):
+            # On Linux, the icon is often a PNG file in a resources or icons folder
+            # near the executable.
+            icon_path = os.path.join(os.path.dirname(exec_path), "resources", "icon.png")
+
+        if icon_path and os.path.exists(icon_path):
+            self.logger.debug("Found application icon at: %s", icon_path)
+            return icon_path
+
+        # the engine icon
+        self.logger.debug("Using fallback engine icon.")
+        engine_icon = os.path.join(self.disk_location, "icon_256.png")
+        return engine_icon
+
+    def _get_user_plugin_path(self):
+        """
+        Returns the platform-specific path to the user's Substance 3D Painter
+        plugins directory. It checks for both modern (Adobe) and legacy
+        (Allegorithmic) paths.
+
+        :return: Path to the user plugins directory.
+        """
         if sys.platform == "win32":
             import ctypes.wintypes
 
             CSIDL_PERSONAL = 5  # My Documents
-            SHGFP_TYPE_CURRENT = 0  # Get current My Documents folder, not default value
+            SHGFP_TYPE_CURRENT = 0  # Get current My Documents folder
 
             path_buffer = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
             ctypes.windll.shell32.SHGetFolderPathW(
                 None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, path_buffer
             )
-
+            documents_path = path_buffer.value
+            
             # Check for new and old plugin paths
-            user_scripts_path = os.path.join(path_buffer.value, "Adobe", "Adobe Substance 3D Painter", "plugins")
-            if not os.path.exists(user_scripts_path):
-                user_scripts_path = os.path.join(path_buffer.value, "Allegorithmic", "Substance Painter", "plugins")
-
-        else:
-            user_scripts_path = os.path.expanduser(r"~/Documents/Adobe/Adobe Substance 3D Painter/plugins")
-            if not os.path.exists(user_scripts_path):
-                user_scripts_path = os.path.expanduser(r"~/Documents/Allegorithmic/Substance Painter/plugins")
-
-        ensure_scripts_up_to_date(resources_plugins_path, user_scripts_path)
-
-        # args = '&SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP=%s;SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON=%s' % (startup_path, sys.executable)
-        return LaunchInformation(exec_path, args, required_env)
-
-    def _icon_from_engine(self):
-        """
-        Use the default engine icon as substancepainter does not supply
-        an icon in their software directory structure.
-
-        :returns: Full path to application icon as a string or None.
-        """
-
-        # the engine icon
-        engine_icon = os.path.join(self.disk_location, "icon_256.png")
-        return engine_icon
+            adobe_path = os.path.join(documents_path, "Adobe", "Adobe Substance 3D Painter", "plugins")
+            allegorithmic_path = os.path.join(documents_path, "Allegorithmic", "Substance Painter", "plugins")
+            return adobe_path if os.path.exists(os.path.dirname(adobe_path)) else allegorithmic_path
+        else: # macOS and Linux
+            adobe_path = os.path.expanduser(r"~/Documents/Adobe/Adobe Substance 3D Painter/plugins")
+            allegorithmic_path = os.path.expanduser(r"~/Documents/Allegorithmic/Substance Painter/plugins")
+            return adobe_path if os.path.exists(os.path.dirname(adobe_path)) else allegorithmic_path
 
     def _is_supported(self, sw_version):
         """
@@ -349,12 +393,12 @@ class SubstancePainterLauncher(SoftwareLauncher):
         if sw_version.version == UNKNOWN_VERSION:
             return (True, "")
 
-        # convert to new version system if required
-        version = to_normalized_version(sw_version.version)
+        # normalize the version string for comparison
+        version = utils.to_normalized_version(sw_version.version)
 
         # second, compare against the minimum version
         if self.minimum_supported_version:
-            min_version = to_normalized_version(self.minimum_supported_version)
+            min_version = utils.to_normalized_version(self.minimum_supported_version)
 
             if version < min_version:
                 # the version is older than the minimum supported version
@@ -385,11 +429,11 @@ class SubstancePainterLauncher(SoftwareLauncher):
 
     def scan_software(self):
         """
-        Scan the filesystem for substancepainter executables.
+        Scan the filesystem for Substance 3D Painter executables.
 
         :return: A list of :class:`SoftwareVersion` objects.
         """
-        self.logger.debug("Scanning for SubstancePainter executables...")
+        self.logger.debug("Scanning for Substance 3D Painter executables...")
 
         supported_sw_versions = []
         for sw_version in self._find_software():
@@ -404,13 +448,33 @@ class SubstancePainterLauncher(SoftwareLauncher):
 
         return supported_sw_versions
 
+    def _get_mac_version(self, bundle_path):
+        """
+        Get the version number from the app bundle's Info.plist file.
+
+        :param str bundle_path: Path to the .app bundle.
+        :return: The version string or UNKNOWN_VERSION.
+        """
+        try:
+            # The plistlib module is standard in Python 3.
+            import plistlib
+
+            plist_path = os.path.join(bundle_path, "Contents", "Info.plist")
+            with open(plist_path, "rb") as fp:
+                plist_data = plistlib.load(fp)
+            return plist_data.get("CFBundleShortVersionString", UNKNOWN_VERSION)
+        except Exception as e:
+            self.logger.warning("Could not read version from %s: %s", plist_path, e)
+            return UNKNOWN_VERSION
+
     def _find_software(self):
         """
         Find executables in the default install locations.
         """
 
         # all the executable templates for the current OS
-        executable_templates = self.EXECUTABLE_TEMPLATES.get(sys.platform, [])
+        platform = "linux" if sys.platform.startswith("linux") else sys.platform
+        executable_templates = self.EXECUTABLE_TEMPLATES.get(platform, [])
 
         # all the discovered executables
         sw_versions = []
@@ -432,6 +496,8 @@ class SubstancePainterLauncher(SoftwareLauncher):
                     executable_version = get_file_info(executable_path, "FileVersion")
                     # make sure we remove those pesky \x00 characters
                     executable_version = executable_version.strip("\x00")
+                elif sys.platform == "darwin":
+                    executable_version = self._get_mac_version(executable_path)
                 else:
                     executable_version = key_dict.get("version", UNKNOWN_VERSION)
 
@@ -441,9 +507,9 @@ class SubstancePainterLauncher(SoftwareLauncher):
                 sw_versions.append(
                     SoftwareVersion(
                         executable_version,
-                        "Substance Painter",
+                        "Adobe Substance 3D Painter",
                         executable_path,
-                        self._icon_from_engine(),
+                        self._get_icon(executable_path),
                     )
                 )
 

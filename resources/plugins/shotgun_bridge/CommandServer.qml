@@ -2,14 +2,27 @@
 // The communication is more similar to rpc json than what it was it that
 // plugin example.
 
-// __author__ = "Diego Garcia Huerta"
-// __email__ = "diegogh2000@gmail.com"
+// Original code by: Diego Garcia Huerta
+// Updated by: Stephen Studyvin
 
+// Updated:
+// September 2025, to support current Adobe Substance 3D Painter version.
 
-import Painter 1.0
 import QtQuick 2.7
 import QtWebSockets 1.0
 
+/**
+ * CommandServer.qml
+ *
+ * This QML component creates a WebSocket server within Adobe Substance 3D Painter.
+ * It acts as a bridge, allowing an external Python process (the FlowPTR engine)
+ * to send commands to and receive results from the application.
+ *
+ * The communication protocol is based on JSON-RPC 2.0.
+ * - The server listens for incoming commands from the Python client.
+ * - It executes registered callbacks based on the command's 'method'.
+ * - It sends back a 'result' or an 'error' object.
+ */
 Item {
   id: root
 
@@ -25,33 +38,52 @@ Item {
   property var _callbacks: null
   property var m_id: 1
 
-
+  /**
+   * Logs an informational message to Adobe Substance 3D Painter console.
+   */
   function log_info(message)
   {
-    alg.log.info("Shotgun bridge: " + message.toString());
+    alg.log.info("FlowPTR bridge: " + message.toString());
   }
  
+  /**
+   * Logs a warning message to Adobe Substance 3D Painter console.
+   */
   function log_warning(message)
   {
-    alg.log.warning("Shotgun bridge: " + message.toString());
+    alg.log.warning("FlowPTR bridge: " + message.toString());
   }
  
+  /**
+   * Logs a debug message to Adobe Substance 3D Painter console, only if debugging is enabled.
+   */
   function log_debug(message)
   {
     if (root.debug)
-      alg.log.info("(DEBUG) Shotgun bridge: " + message.toString());
+      alg.log.info("(DEBUG) FlowPTR bridge: " + message.toString());
   }
  
+  /**
+   * Logs an error message to Adobe Substance 3D Painter console.
+   */
   function log_error(message)
   {
-    alg.log.error("Shotgun bridge: " + message.toString());
+    alg.log.error("FlowPTR bridge: " + message.toString());
   }
  
+  /**
+   * Logs an exception message to Adobe Substance 3D Painter console.
+   */
   function log_exception(message)
   {
-    alg.log.exception("Shotgun bridge: " + message.toString());
+    alg.log.exception("FlowPTR bridge: " + message.toString());
   }
 
+  /**
+   * Registers a JavaScript function to be called when a specific command is received.
+   * @param {string} command - The name of the command (case-insensitive).
+   * @param {function} callback - The function to execute.
+   */
   function registerCallback(command, callback) {
     if (_callbacks === null) {
       _callbacks = {};
@@ -59,6 +91,11 @@ Item {
     _callbacks[command.toUpperCase()] = callback;
   }
 
+  /**
+   * Sends a command to the connected client. (Not typically used by the server).
+   * @param {string} command - The method name for the JSON-RPC request.
+   * @param {object} data - The parameters for the command.
+   */
   function sendCommand(command, data) {
     if (!connected) {
       alg.log.warn(qsTr("Can't send \"%1\" command as there is no client connected").arg(command));
@@ -79,6 +116,11 @@ Item {
     }
   }
 
+  /**
+   * Sends a JSON-RPC 2.0 compliant response back to the client.
+   * @param {string} message_id - The ID from the original request.
+   * @param {any} result - The data to be sent as the result.
+   */
   function sendResult(message_id, result)
   {
     var jsonData;
@@ -96,7 +138,12 @@ Item {
       log_debug("Sent.");
     }
     catch(err) {
-      jsonData = {"jsonrpc": "2.0", "error": err || null, "id": message_id};
+      // Construct a JSON-RPC 2.0 compliant error object.
+      var error_obj = {
+          code: -32000, // Generic server error
+          message: err.message || "An unknown error occurred."
+      };
+      jsonData = {"jsonrpc": "2.0", "error": error_obj, "id": message_id};
       log_debug("Sending error:" + JSON.stringify(jsonData));
       server.currentWebSocket.sendTextMessage(JSON.stringify(jsonData));
       alg.log.error(qsTr("Unexpected error while sending \"%1\" message id: %2").arg(message_id).arg(err.message));
@@ -109,10 +156,11 @@ Item {
     listen: false
     port: 12345
     property var currentWebSocket: null
-    name: "Substance Painter Bridge"
+    name: "Adobe Substance 3D Painter Bridge"
     accept: !root.connected // Ensure only one connection at a time
 
     onClientConnected: {
+      // A new client has connected. Store the socket for communication.
       currentWebSocket = webSocket;
 
       webSocket.statusChanged.connect(function onWSStatusChanged() {
@@ -127,6 +175,7 @@ Item {
           }
       });
       webSocket.onTextMessageReceived.connect(function onWSTxtMessageReceived(message) {
+        // A new message has been received from the client.
         // Try to retrieve command and json data
         var command, jsonData, message_id;
         try {
@@ -142,6 +191,7 @@ Item {
         }
         log_debug("Message received: " + message)
 
+        // Check if a callback is registered for the received command.
         if (root._callbacks && command in root._callbacks) {
           try {
             var result = root._callbacks[command](jsonData.params)

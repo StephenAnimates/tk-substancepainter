@@ -8,23 +8,30 @@
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
+# Original code by: Diego Garcia Huerta, https://www.linkedin.com/in/diegogh/
+# Updated by: Stephen Studyvin
+
+# Updated:
+# September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
+
 import os
 import tempfile
 import uuid
 
-import tank
-from tank import Hook
-from tank.platform.qt import QtCore, QtGui
+import sgtk
 
+HookBaseClass = sgtk.get_hook_baseclass()
 
-class ThumbnailHook(Hook):
+class ThumbnailHook(HookBaseClass):
     """
-    Hook that can be used to provide a pre-defined thumbnail for the app
+    Hook that can be used to generate a thumbnail for the current session.
+    It is used by apps like the Publisher to create a thumbnail for a publish.
     """
 
     def execute(self, **kwargs):
         """
         Main hook entry point
+
         :returns:       String
                         Hook should return a file path pointing to the location
                         of a thumbnail file on disk that will be used.
@@ -32,29 +39,36 @@ class ThumbnailHook(Hook):
                         functionality will be enabled in the UI.
         """
         # get the engine name from the parent object (app/engine/etc.)
-        engine = self.parent.engine
-        engine_name = engine.name
+        engine = sgtk.platform.current_engine()
 
         # depending on engine:
-        if engine_name == "tk-substancepainter":
+        if engine and engine.name == "tk-substancepainter":
             return self._extract_substancepainter_thumbnail()
 
-        # default implementation does nothing
+        # For any other engine, fall back to the default behavior.
         return None
 
     def _extract_substancepainter_thumbnail(self):
         """
-        Render a thumbnail for the current canvas in Substance Painter
+        Generates and saves a thumbnail from the current Substance 3D Painter viewport.
+
+        This method uses the engine's built-in `extract_thumbnail` function, which
+        sends a request to the QML plugin to capture the viewport via the native API.
+        This is more reliable than a generic screen grab.
 
         :returns:   The path to the thumbnail on disk
         """
-        thumb = QtGui.QPixmap.grabWindow(QtGui.QApplication.desktop().winId())
+        engine = sgtk.platform.current_engine()
 
-        if thumb:
-            # save the thumbnail
-            temp_dir = tempfile.gettempdir()
-            temp_filename = "sgtk_thumb_%s.jpg" % uuid.uuid4().hex
-            jpg_thumb_path = os.path.join(temp_dir, temp_filename)
-            thumb.save(jpg_thumb_path)
+        # Define a temporary path to save the thumbnail to.
+        temp_dir = tempfile.gettempdir()
+        temp_filename = "sgtk_thumb_%s.jpg" % uuid.uuid4().hex
+        thumb_path = os.path.join(temp_dir, temp_filename)
 
-        return jpg_thumb_path
+        # Ask the engine to save the thumbnail to the specified path.
+        if engine.app.extract_thumbnail(thumb_path):
+            self.parent.log_debug("Successfully generated thumbnail: %s" % thumb_path)
+            return thumb_path
+        else:
+            self.parent.log_error("Thumbnail generation failed.")
+            return None

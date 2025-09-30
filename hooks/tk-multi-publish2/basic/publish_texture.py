@@ -8,12 +8,19 @@
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
+# Original code by: Diego Garcia Huerta, https://www.linkedin.com/in/diegogh/
+# Updated by: Stephen Studyvin
+
+# Updated:
+# September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
+
+# https://help.autodesk.com/view/SGDEV/ENU/
+
 import os
 import pprint
 
 import sgtk
 from sgtk.util.filesystem import ensure_folder_exists
-
 
 __author__ = "Diego Garcia Huerta"
 __contact__ = "https://www.linkedin.com/in/diegogh/"
@@ -22,13 +29,15 @@ __contact__ = "https://www.linkedin.com/in/diegogh/"
 HookBaseClass = sgtk.get_hook_baseclass()
 
 
-class SubstancePainterTexturesPublishPlugin(HookBaseClass):
+class SubstancePainterTexturePublishPlugin(HookBaseClass):
     """
-    Plugin for publishing an open Substance Painter session.
+    Plugin for publishing an individual texture file that has been exported from
+    the current Substance 3D Painter session.
 
-    This hook relies on functionality found in the base file publisher hook in
-    the publish2 app and should inherit from it in the configuration. The hook
-    setting for this plugin should look something like this::
+    This plugin is configured to run when the collector creates an item of type
+    'substancepainter.texture'. This happens when the collector setting
+    'Publish Textures as Folder' is set to False. The hook setting for this
+    plugin should look something like this in the publish2 app configuration::
 
         hook: "{self}/publish_file.py:{engine}/tk-multi-publish2/basic/publish_session.py"
 
@@ -39,56 +48,22 @@ class SubstancePainterTexturesPublishPlugin(HookBaseClass):
     @property
     def description(self):
         """
-        Verbose, multi-line description of what the plugin does. This can
-        contain simple html for formatting.
+        Verbose, multi-line description of what the plugin does. This can contain simple html for formatting.
         """
 
-        loader_url = "https://support.shotgunsoftware.com/hc/en-us/articles/219033078"
+        loader_url = "https://help.autodesk.com/view/SGDEV/ENU/?guid=SG_Supervisor_Artist_sa_integrations_sa_integrations_user_guide_html#the-loader"
 
         return """
-        Publishes the file to Shotgun. A <b>Publish</b> entry will be
-        created in Shotgun which will include a reference to the file's current
-        path on disk. If a publish template is configured, a copy of the
-        current session will be copied to the publish template path which
-        will be the file that is published. Other users will be able to access
-        the published file via the <b><a href='%s'>Loader</a></b> so long as
-        they have access to the file's location on disk.
+        This plugin publishes an individual texture file to Flow Production Tracking.
+        A <b>Publish</b> entry of type 'Texture' will be created, and the texture
+        file will be copied to the publish location defined by the 'Publish Template'
+        setting.
 
-        If the session has not been saved, validation will fail and a button
-        will be provided in the logging output to save the file.
+        Other artists will be able to access the published texture via the
+        <b><a href='%s'>Loader</a></b>.
 
-        <h3>File versioning</h3>
-        If the filename contains a version number, the process will bump the
-        file to the next version after publishing.
-
-        The <code>version</code> field of the resulting <b>Publish</b> in
-        Shotgun will also reflect the version number identified in the filename
-        The basic worklfow recognizes the following version formats by default:
-
-        <ul>
-        <li><code>filename.v###.ext</code></li>
-        <li><code>filename_v###.ext</code></li>
-        <li><code>filename-v###.ext</code></li>
-        </ul>
-
-        After publishing, if a version number is detected in the work file, the
-        work file will automatically be saved to the next incremental version
-        number. For example, <code>filename.v001.ext</code> will be published
-        and copied to <code>filename.v002.ext</code>
-
-        If the next incremental version of the file already exists on disk, the
-        validation step will produce a warning, and a button will be provided
-        in the logging output which will allow saving the session to the next
-        available version number prior to publishing.
-
-        <br><br><i>NOTE: any amount of version number padding is supported. for
-        non-template based workflows.</i>
-
-        <h3>Overwriting an existing publish</h3>
-        In non-template workflows, a file can be published multiple times,
-        however only the most recent publish will be available to other users.
-        Warnings will be provided during validation if there are previous
-        publishes.
+        The version number for the publish will be automatically calculated based
+        on previous publishes of the same name.
         """ % (
             loader_url,
         )
@@ -114,9 +89,7 @@ class SubstancePainterTexturesPublishPlugin(HookBaseClass):
         """
 
         # inherit the settings from the base publish plugin
-        base_settings = (
-            super(SubstancePainterTexturesPublishPlugin, self).settings or {}
-        )
+        base_settings = super().settings or {}
 
         # settings specific to this class
         substancepainter_publish_settings = {
@@ -154,6 +127,10 @@ class SubstancePainterTexturesPublishPlugin(HookBaseClass):
         A publish task will be generated for each item accepted here. Returns a
         dictionary with the following booleans:
 
+
+        A publish task will be generated for each item accepted here. Returns a
+        dictionary with the following booleans:
+
             - accepted: Indicates if the plugin is interested in this value at
                 all. Required.
             - enabled: If True, the plugin will be enabled in the UI, otherwise
@@ -186,6 +163,11 @@ class SubstancePainterTexturesPublishPlugin(HookBaseClass):
         """
         Validates the given item to check that it is ok to publish. Returns a
         boolean to indicate validity.
+
+        This method is called after the user has ticked the checkbox for this
+        plugin in the UI. It performs checks to ensure that the operation can
+        proceed safely. Here, it makes sure that a publish template is defined
+        and that the texture file actually exists on disk.
 
         :param settings: Dictionary of Settings. The keys are strings, matching
                          the keys returned in the settings property. The values 
@@ -222,6 +204,12 @@ class SubstancePainterTexturesPublishPlugin(HookBaseClass):
         """
         Executes the publish logic for the given item and settings.
 
+        This is where the main work happens. It performs the following steps:
+        1. Determines the next version number for the publish.
+        2. Resolves the final publish path using the configured template.
+        3. Copies the texture file to the publish path.
+        4. Registers the new publish in Flow Production Tracking.
+
         :param settings: Dictionary of Settings. The keys are strings, matching
                          the keys returned in the settings property.
                          The values are `Setting` instances.
@@ -236,21 +224,28 @@ class SubstancePainterTexturesPublishPlugin(HookBaseClass):
         _, filename = os.path.split(src)
         filenamefile, extension = os.path.splitext(filename)
 
-        # Get fields from the current context
+        # Get fields from the current context to use for resolving the publish path.
         fields = {}
         ctx_fields = self.parent.context.as_template_fields(publish_template)
         fields.update(ctx_fields)
 
+        # The publish name is based on the context entity and the texture name
+        # (e.g., 'Character_Wood_BaseColor').
         context_entity_type = self.parent.context.entity["type"]
         publish_name = context_entity_type + "_" + filenamefile
 
+        # Find previous publishes of the same name and type to determine the next version number.
         existing_publishes = self._find_publishes(
             self.parent.context, publish_name, publish_type
         )
         version = max([p["version_number"] for p in existing_publishes] or [0]) + 1
         fields["version"] = version
+
+        # The template may also contain keys for the texture channel and extension.
         fields["channel"] = filenamefile
         fields["extension"] = extension[1:]  # no dot
+
+        # Resolve the final publish path.
         publish_path = publish_template.apply_fields(fields)
         publish_path = sgtk.util.ShotgunPath.normalize(publish_path)
 
@@ -259,9 +254,10 @@ class SubstancePainterTexturesPublishPlugin(HookBaseClass):
         # make sure destination folder exists
         ensure_folder_exists(publish_dir)
 
+        # Copy the texture file to the final publish location.
         sgtk.util.filesystem.copy_file(src, publish_path)
 
-        self.logger.info("A Publish will be created in Shotgun and linked to:")
+        self.logger.info("A Published file will be created in Flow Production Tracking and linked to:")
         self.logger.info("  %s" % (publish_path,))
 
         # arguments for publish registration
@@ -276,6 +272,7 @@ class SubstancePainterTexturesPublishPlugin(HookBaseClass):
 
         self.logger.info("Registering publish...")
 
+        # ---- Register the publish in Flow Production Tracking.
         publish_data = {
             "tk": publisher.sgtk,
             "context": item.context,
@@ -318,6 +315,9 @@ class SubstancePainterTexturesPublishPlugin(HookBaseClass):
         Execute the finalization pass. This pass executes once all the publish
         tasks have completed, and can for example be used to version up files.
 
+        In this case, there's nothing to do, so we just call the base class
+        implementation.
+
         :param settings: Dictionary of Settings. The keys are strings, matching
                          the keys returned in the settings property.
                          The values are `Setting` instances.
@@ -325,18 +325,18 @@ class SubstancePainterTexturesPublishPlugin(HookBaseClass):
         """
 
         # do the base class finalization
-        super(SubstancePainterTexturesPublishPlugin, self).finalize(settings, item)
+        super().finalize(settings, item)
 
     def _find_publishes(self, ctx, publish_name, publish_type):
         """
-        Given a context, publish name and type, find all publishes from Shotgun
+        Given a context, publish name and type, find all publishes from Flow Production Tracking (ShotGrid)
         that match.
         
         :param ctx:             Context to use when looking for publishes
         :param publish_name:    The name of the publishes to look for
         :param publish_type:    The type of publishes to look for
         
-        :returns:               A list of Shotgun publish records that match the search
+        :returns:               A list of Flow Production Tracking publish records that match the search
                                 criteria        
         """
         publish_entity_type = sgtk.util.get_published_file_entity_type(self.parent.sgtk)
@@ -358,32 +358,16 @@ class SubstancePainterTexturesPublishPlugin(HookBaseClass):
         if publish_type:
             filters.append([publish_type_field, "is", publish_type])
 
-        # retrieve a list of all matching publishes from Shotgun:
+        # retrieve a list of all matching publishes from Flow Production Tracking:
         sg_publishes = []
         try:
             query_fields = ["version_number"]
             sg_publishes = self.parent.shotgun.find(
                 publish_entity_type, filters, query_fields
             )
-        except Exception, e:
+        except Exception as e:
             self.logger.error(
                 "Failed to find publishes of type '%s', called '%s', for context %s: %s"
                 % (publish_name, publish_type, ctx, e)
             )
         return sg_publishes
-
-
-def _export_path():
-    """
-    Return the path to the current session
-    :return:
-    """
-    engine = sgtk.platform.current_engine()
-
-    # get the path to the current file
-    path = engine.app.get_project_export_path()
-
-    if isinstance(path, unicode):
-        path = path.encode("utf-8")
-
-    return path

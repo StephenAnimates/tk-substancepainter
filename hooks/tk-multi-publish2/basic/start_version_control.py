@@ -8,18 +8,21 @@
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
+# Original code by: Diego Garcia Huerta, https://www.linkedin.com/in/diegogh/
+# Updated by: Stephen Studyvin
+
+# Updated:
+# September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
+
 import os
 
 import sgtk
-from sgtk.util.filesystem import ensure_folder_exists
-
 
 __author__ = "Diego Garcia Huerta"
 __contact__ = "https://www.linkedin.com/in/diegogh/"
-
+utils = sgtk.platform.current_engine().import_module("tk_substancepainter.utils")
 
 HookBaseClass = sgtk.get_hook_baseclass()
-
 
 class SubstancePainterStartVersionControlPlugin(HookBaseClass):
     """
@@ -106,6 +109,11 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
         A publish task will be generated for each item accepted here. Returns a
         dictionary with the following booleans:
 
+        The 'accept' method is called for each item collected by the publisher.
+        It decides if this plugin is interested in operating on the item. In this
+        case, it checks if the current session file already has a version number.
+        If it does, this plugin is not needed, so it rejects the item.
+
             - accepted: Indicates if the plugin is interested in this value at
                 all. Required.
             - enabled: If True, the plugin will be enabled in the UI, otherwise
@@ -123,8 +131,10 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
         :returns: dictionary with boolean keys accepted, required and enabled
         """
 
-        path = _session_path()
+        path = utils.get_session_path()
 
+        # First, check if the session has been saved at all.
+        # If not, we can't do anything, so we'll accept but validation will fail later.
         if path:
             version_number = self._get_version_number(path, item)
             if version_number is not None:
@@ -141,7 +151,7 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
             # validation will succeed.
             self.logger.warn(
                 "The Substance Painter session has not been saved.",
-                extra=_get_save_as_action(),
+                extra=utils.get_save_as_action(),
             )
 
         self.logger.info(
@@ -160,6 +170,11 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
 
         Returns a boolean to indicate validity.
 
+        This method is called after the user has ticked the checkbox for this
+        plugin in the UI. It performs checks to ensure that the operation can
+        proceed safely. Here, it makes sure the session is saved and that the
+        new versioned file path doesn't already exist.
+
         :param settings: Dictionary of Settings. The keys are strings, matching
                          the keys returned in the settings property. 
                          The values are `Setting` instances.
@@ -169,13 +184,13 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
         """
 
         publisher = self.parent
-        path = _session_path()
+        path = utils.get_session_path()
 
         if not path:
             # the session still requires saving. provide a save button.
             # validation fails
             error_msg = "The Substance Painter session has not been saved."
-            self.logger.error(error_msg, extra=_get_save_as_action())
+            self.logger.error(error_msg, extra=utils.get_save_as_action())
             raise Exception(error_msg)
 
         # NOTE: If the plugin is attached to an item, that means no version
@@ -186,12 +201,14 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
 
         # get the path to a versioned copy of the file.
         version_path = publisher.util.get_version_path(path, "v001")
+
+        # Check if a file with 'v001' already exists. If so, we can't proceed.
         if os.path.exists(version_path):
             error_msg = (
                 "A file already exists with a version number. Please "
                 "choose another name."
             )
-            self.logger.error(error_msg, extra=_get_save_as_action())
+            self.logger.error(error_msg, extra=utils.get_save_as_action())
             raise Exception(error_msg)
 
         return True
@@ -199,6 +216,11 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
     def publish(self, settings, item):
         """
         Executes the publish logic for the given item and settings.
+
+        This is where the main work happens. It saves the current session to
+        ensure it's up-to-date, then calculates the new path with 'v001'
+        and saves the session again to that new path. This creates the first
+        versioned file.
 
         :param settings: Dictionary of Settings. The keys are strings, matching
                          the keys returned in the settings property. 
@@ -210,16 +232,17 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
 
         # get the path in a normalized state. no trailing separator, separators
         # are appropriate for current os, no double separators, etc.
-        path = sgtk.util.ShotgunPath.normalize(_session_path())
+        path = sgtk.util.ShotgunPath.normalize(utils.get_session_path())
 
+        self.logger.info("Saving current session before versioning...")
         # ensure the session is saved in its current state
-        _save_session(path)
+        utils.save_session(path)
 
         # get the path to a versioned copy of the file.
         version_path = publisher.util.get_version_path(path, "v001")
 
         # save to the new version path
-        _save_session(version_path)
+        utils.save_session(version_path)
         self.logger.info(
             "A version number has been added to the Substance Painter file..."
         )
@@ -241,6 +264,10 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
     def _get_version_number(self, path, item):
         """
         Try to extract and return a version number for the supplied path.
+
+        This helper method is used by the 'accept' logic to determine if a
+        file path already contains a version number. It first tries to use
+        the project's work file template, then falls back to a regex-based check.
 
         :param path: The path to the current session
 
@@ -275,60 +302,6 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
         return version_number
 
 
-def _session_path():
-    """
-    Return the path to the current session
-    :return:
-    """
-    engine = sgtk.platform.current_engine()
-
-    # get the path to the current file
-    path = engine.app.get_current_project_path()
-
-    if isinstance(path, unicode):
-        path = path.encode("utf-8")
-
-    return path
-
-
-def _save_session(path):
-    """
-    Save the current session to the supplied path.
-    """
-
-    # Ensure that the folder is created when saving
-    folder = os.path.dirname(path)
-    ensure_folder_exists(folder)
-
-    engine = sgtk.platform.current_engine()
-    engine.app.save_project_as(path)
-
-
-# TODO: method duplicated in all the Substance Painter hooks
-def _get_save_as_action():
-    """
-    Simple helper for returning a log action dict for saving the session
-    """
-
-    engine = sgtk.platform.current_engine()
-
-    callback = _save_as
-
-    # if workfiles2 is configured, use that for file save
-    if "tk-multi-workfiles2" in engine.apps:
-        app = engine.apps["tk-multi-workfiles2"]
-        if hasattr(app, "show_file_save_dlg"):
-            callback = app.show_file_save_dlg
-
-    return {
-        "action_button": {
-            "label": "Save As...",
-            "tooltip": "Save the current session",
-            "callback": callback,
-        }
-    }
-
-
 def _get_version_docs_action():
     """
     Simple helper for returning a log action to show version docs
@@ -340,8 +313,3 @@ def _get_version_docs_action():
             "url": "https://support.shotgunsoftware.com/hc/en-us/articles/115000068574-User-Guide-WIP-#What%20happens%20when%20you%20publish",
         }
     }
-
-
-def _save_as():
-    engine = sgtk.platform.current_engine()
-    engine.app.save_project_as_action()

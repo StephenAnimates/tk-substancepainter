@@ -8,6 +8,12 @@
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
+# Original code by: Diego Garcia Huerta, https://www.linkedin.com/in/diegogh/
+# Updated by: Stephen Studyvin
+
+# Updated:
+# September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
+
 import os
 
 import sgtk
@@ -25,8 +31,11 @@ SESSION_PUBLISHED_TYPE = "Substance Painter Project File"
 
 class SubstancePainterSessionCollector(HookBaseClass):
     """
-    Collector that operates on the substance painter session. Should inherit 
-    from the basic collector hook.
+    Collector that operates on the current Substance 3D Painter session.
+
+    This collector produces publish items for the current session file and for
+    any textures exported from it. It is responsible for discovering and
+    creating the items that will be displayed in the publisher UI.
     """
 
     @property
@@ -50,9 +59,7 @@ class SubstancePainterSessionCollector(HookBaseClass):
         """
 
         # grab any base class settings
-        collector_settings = (
-            super(SubstancePainterSessionCollector, self).settings or {}
-        )
+        collector_settings = super().settings or {}
 
         # settings specific to this collector
         substancepainter_session_settings = {
@@ -75,11 +82,11 @@ class SubstancePainterSessionCollector(HookBaseClass):
             "Publish Textures as Folder": {
                 "type": "bool",
                 "default": True,
-                "description": "Publish Substance Painter textures as a folder."
+                "description": "Publish Substance 3D Painter textures as a folder."
                 "If true (default) textures will be all exported"
                 " together as a folder publish."
                 "If false, each texture will be exported and"
-                " published as each own version stream.",
+                " published as its own version stream.",
             },
         }
 
@@ -90,25 +97,54 @@ class SubstancePainterSessionCollector(HookBaseClass):
 
     def process_current_session(self, settings, parent_item):
         """
-        Analyzes the current session open in Substance Painter and parents a 
+        Analyzes the current session open in Substance 3D Painter and parents a
         subtree of items under the parent_item passed in.
 
         :param dict settings: Configured settings for this collector
         :param parent_item: Root item instance
-
         """
 
-        # create an item representing the current substance painter session
+        # First, create an item representing the current Substance 3D Painter session file.
         item = self.collect_current_substancepainter_session(settings, parent_item)
 
+        # If a session item was created, proceed to collect exported textures.
         if item:
+            publisher = self.parent
+            engine = publisher.engine
+
+            # Determine the path where textures should be exported.
+            export_path = self.get_export_path(settings)
+            if not export_path:
+                export_path = engine.app.get_project_export_path()
+
+            # Show a busy dialog to the user while textures are being exported.
+            engine.show_busy(
+                "Exporting textures",
+                "Textures are being exported so they can be published.\n\nPlease wait...",
+            )
+
+            try:
+                # Trigger the texture export process.
+                map_export_info = engine.app.export_document_maps(export_path)
+            finally:
+                # Always clear the busy dialog, even if the export fails.
+                engine.clear_busy()
+
+            # Based on the 'Publish Textures as Folder' setting, decide which
+            # collection method to use.
             publish_as_folder_setting = settings.get("Publish Textures as Folder")
             if publish_as_folder_setting and publish_as_folder_setting.value:
-                resource_items = self.collect_textures_as_folder(settings, item)
+                self.collect_textures_as_folder(map_export_info, export_path, item)
             else:
-                resource_items = self.collect_textures(settings, item)
+                self.collect_textures(map_export_info, item)
 
     def get_export_path(self, settings):
+        """
+        Determines the texture export path based on the configured templates.
+
+        :param dict settings: The collector's settings.
+        :return: A path string, or None if templates are not configured correctly.
+        """
         publisher = self.parent
 
         work_template = None
@@ -118,7 +154,7 @@ class SubstancePainterSessionCollector(HookBaseClass):
                 work_template_setting.value
             )
 
-            self.logger.debug("Work template defined for Substance Painter collection.")
+            self.logger.debug("Work template defined for Substance 3D Painter collection.")
 
         work_export_template = None
         work_export_template_setting = settings.get("Work Export Template")
@@ -132,7 +168,7 @@ class SubstancePainterSessionCollector(HookBaseClass):
             )
 
             self.logger.debug(
-                "Work Export template defined for Substance Painter collection."
+                "Work Export template defined for Substance 3D Painter collection."
             )
 
         if work_export_template and work_template:
@@ -144,29 +180,21 @@ class SubstancePainterSessionCollector(HookBaseClass):
 
             return export_path
 
-    def collect_textures_as_folder(self, settings, parent_item):
-        publisher = self.parent
-        engine = publisher.engine
+    def collect_textures_as_folder(self, map_export_info, export_path, parent_item):
+        """
+        Collects all exported textures as a single item representing a folder.
 
+        :param dict map_export_info: Information about the exported maps.
+        :param str export_path: The path where textures were exported.
+        :param parent_item: The parent publish item (the session item).
+        """
         self.logger.debug("Exporting textures as a folder...")
-
-        export_path = self.get_export_path(settings)
-        if not export_path:
-            export_path = engine.app.get_project_export_path()
-
-        engine.show_busy(
-            "Exporting textures",
-            "Texture are being exported so they can " "be published.\n\nPlease wait...",
-        )
-
-        map_export_info = engine.app.export_document_maps(export_path)
-        engine.clear_busy()
-
         self.logger.debug("Collecting exported textures...")
 
         if export_path:
             textures = os.listdir(export_path)
             if textures:
+                # Create a single item for the entire folder of textures.
                 textures_item = parent_item.create_item(
                     "substancepainter.textures",
                     "Textures",
@@ -182,30 +210,21 @@ class SubstancePainterSessionCollector(HookBaseClass):
                 textures_item.properties["path"] = export_path
                 textures_item.properties["publish_type"] = "Texture Folder"
 
-    def collect_textures(self, settings, parent_item):
-        publisher = self.parent
-        engine = sgtk.platform.current_engine()
+    def collect_textures(self, map_export_info, parent_item):
+        """
+        Collects each exported texture as an individual publish item.
 
+        :param dict map_export_info: Information about the exported maps.
+        :param parent_item: The parent publish item (the session item).
+        """
         self.logger.debug("Exporting textures...")
-
-        export_path = self.get_export_path(settings)
-        if not export_path:
-            export_path = engine.app.get_project_export_path()
-
-        engine.show_busy(
-            "Exporting textures",
-            "Texture are being exported so they can " "be published.\n\nPlease wait...",
-        )
-
-        map_export_info = engine.app.export_document_maps(export_path)
-        engine.clear_busy()
-
         self.logger.debug("Collecting exported textures...")
 
         icon_path = os.path.join(self.disk_location, os.pardir, "icons", "texture.png")
 
-        for texture_set_name, texture_set in map_export_info.iteritems():
-            for texture_id, texture_file in texture_set.iteritems():
+        # Iterate through each exported texture and create a separate publish item for it.
+        for texture_set_name, texture_set in map_export_info.items():
+            for texture_id, texture_file in texture_set.items():
                 if os.path.exists(texture_file):
                     _, filenamefile = os.path.split(texture_file)
                     texture_name, _ = os.path.splitext(filenamefile)
@@ -221,7 +240,7 @@ class SubstancePainterSessionCollector(HookBaseClass):
 
     def collect_current_substancepainter_session(self, settings, parent_item):
         """
-        Creates an item that represents the current substance painter session.
+        Creates an item that represents the current Substance 3D Painter session.
 
         :param parent_item: Parent Item instance
 
@@ -239,11 +258,11 @@ class SubstancePainterSessionCollector(HookBaseClass):
             file_info = publisher.util.get_file_path_components(path)
             display_name = file_info["filename"]
         else:
-            display_name = "Current Substance Painter Session"
+            display_name = "Current Substance 3D Painter Session"
 
         # create the session item for the publish hierarchy
         session_item = parent_item.create_item(
-            "substancepainter.session", "Substance Painter Session", display_name,
+            "substancepainter.session", "Substance 3D Painter Session", display_name,
         )
 
         # get the icon path to display for this item
@@ -269,6 +288,6 @@ class SubstancePainterSessionCollector(HookBaseClass):
 
             self.logger.debug("Work template defined for session.")
 
-        self.logger.info("Collected current Substance Painter session")
+        self.logger.info("Collected current Substance 3D Painter session")
 
         return session_item

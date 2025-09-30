@@ -2,9 +2,11 @@
 // The idea is to communicate with the engine through websockets since
 // the engine is written in python.
 
-// __author__ = "Diego Garcia Huerta"
-// __email__ = "diegogh2000@gmail.com"
+// Original code by: Diego Garcia Huerta
+// Updated by: Stephen Studyvin
 
+// Updated:
+// September 2025, to support current Adobe Substance 3D Painter version.
 
 import QtQuick 2.2
 import Painter 1.0
@@ -13,64 +15,66 @@ import QtQuick.Dialogs 1.2
 import QtQuick.Window 2.2
 import "."
 
-
+/**
+ * main.qml
+ *
+ * This is the main entry point for the Flow Production Tracking integration
+ * plugin within Adobe Substance 3D Painter.
+ *
+ * It performs the following key functions:
+ * - Creates and manages the WebSocket server to communicate with the Python engine.
+ * - Bootstraps the external Python engine process.
+ * - Adds a button to the main toolbar to open the FlowPTR menu.
+ * - Exposes Substance 3D Painter's project and application APIs to the Python engine
+ *   through registered commands.
+ */
 PainterPlugin
 {
   id: root
   property var openMenuButton: null
   property bool isEngineLoaded: false
-  // property double shotgun_heartbeat_interval: 1.0; 
   property bool debug: true;
-
-  function log_info(data)
-  {
-    var message = data
-    if (data.hasOwnProperty("message"))
-        message = data.message;
-
-    alg.log.info("Shotgun engine | " + message.toString());
-  }
  
-  function log_warning(data)
-  {
-    var message =  data.message ? ("message" in data) : data;
-    if (data.hasOwnProperty("message"))
-        message = data.message;
-
-    alg.log.warning("Shotgun engine | " + message.toString());
+  /**
+   * Helper function to extract a message string from a data object.
+   * @param {any} data - The input data, which can be a string or an object with a 'message' property.
+   * @returns {string}
+   */
+  function _getLogMessage(data) {
+    if (typeof data === 'object' && data !== null && data.hasOwnProperty("message")) {
+        return data.message.toString();
+    }
+    return data.toString();
   }
- 
-  function log_debug(data)
-  {
-    var message =  data.message ? ("message" in data) : data;
-    if (data.hasOwnProperty("message"))
-        message = data.message;
 
-    if (root.debug)
-      alg.log.info("(DEBUG) Shotgun engine | " + message.toString());
+  function log_info(data) {
+    alg.log.info("FlowPTR engine | " + _getLogMessage(data));
   }
- 
-  function log_error(data)
-  {
-    var message =  data.message ? ("message" in data) : data;
-    if (data.hasOwnProperty("message"))
-        message = data.message;
 
-    alg.log.error("Shotgun engine | " + message.toString());
+  function log_warning(data) {
+    alg.log.warning("FlowPTR engine | " + _getLogMessage(data));
   }
- 
-  function log_exception(data)
-  {
-    var message =  data.message ? ("message" in data) : data;
-    if (data.hasOwnProperty("message"))
-        message = data.message;
 
-    alg.log.exception("Shotgun engine | " + message.toString());
+  function log_debug(data) {
+    if (root.debug) {
+      alg.log.info("(DEBUG) FlowPTR engine | " + _getLogMessage(data));
+    }
+  }
+
+  function log_error(data) {
+    alg.log.error("FlowPTR engine | " + _getLogMessage(data));
+  }
+
+  function log_exception(data) {
+    alg.log.exception("FlowPTR engine | " + _getLogMessage(data));
   }
 
   Component.onCompleted:
   {
-    log_debug("Initializing Shotgun Bridge Plugin.");
+    // This block is executed once when the plugin is first loaded.
+    // It handles the initial setup of the bridge.
+
+    log_debug("Initializing FlowPTR Bridge Plugin.");
 
     // get the port we have been assigned from sthe startup software launcher
     var args = Qt.application.arguments[1];
@@ -80,9 +84,11 @@ PainterPlugin
         typeof(query.SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP) === "undefined" ||
         typeof(query.SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON) === "undefined")
     {
+      // If the required environment variables are not present, it means
+      // Substance 3D Painter was not launched through the FlowPTR launcher.
       // we are not in a shotgun toolkit environment, so we bail out as soon as
       // possible
-      log_warning("Not in an shotgun toolkit environment so the engine won't be run. Have you launched Substance Painter through the Shotgun Desktop application ?");
+      log_warning("Not in a Flow Production Tracking environment so the engine won't be run. Have you launched Substance 3D Painter through the FlowPTR Desktop application?");
       return;
     }
 
@@ -96,7 +102,6 @@ PainterPlugin
 
     openMenuButton.clicked.connect(displayMenu);
     openMenuButton.enabled = Qt.binding(function() { return root.isEngineLoaded; });
-    openMenuButton.isEngineLoaded = Qt.binding(function() { return root.isEngineLoaded; });
 
     // We initialize here the engine instead of when the app has finished 
     // loading because the user can always reload the plugin from the Plugins
@@ -109,6 +114,10 @@ PainterPlugin
 
   onNewProjectCreated:
   {
+    // This signal is emitted by Substance 3D Painter when a new project is created.
+    // We check if a mesh was imported and, if so, send its path to the engine
+    // so it can potentially change the Toolkit context.
+
     // Called when a new project is created, before the onProjectOpened callback
 
     // no chance this project is saved, but if a mesh that is known by
@@ -123,19 +132,18 @@ PainterPlugin
 
   onProjectOpened:
   {
+    // This signal is emitted by Substance 3D Painter when a project is fully loaded.
+    // We send the project path to the engine so it can synchronize its context.
+
     // Called when the project is fully loaded
     server.sendCommand("PROJECT_OPENED", {path:currentProjectPath()});
   }
 
-  // Timer {
-  //   id: checkConnectionTimer
-  //   repeat: true
-  //   interval: root.shotgun_heartbeat_interval * 1000
-  //   onTriggered: checkConnection()
-  // }
-
   function getQueryParams(qs)
   {
+    /**
+     * Parses a URL query string into a key-value parameter object.
+     */
     // This takes care of parsing the parameters passed in the command line
     // to substance painter
     var params = {};
@@ -162,8 +170,12 @@ PainterPlugin
 
   function onProcessEndedCallback(result)
   {
+    /**
+     * Callback executed when the external Python engine process terminates.
+     * If the process crashed, it attempts to restart it to maintain the connection.
+     */
     // We try to keep the engine alive by restarting it if something went wrong.
-    log_warning("Shotgun Substance Painter Engine connection was lost. Restarting engine...");
+    log_warning("FlowPTR Engine connection was lost. Restarting engine...");
     if (result.crashed)
     {
       bootstrapEngine();
@@ -172,36 +184,38 @@ PainterPlugin
 
   function bootstrapEngine()
   {
+    /**
+     * Starts the external Python engine process.
+     * It retrieves the path to the Python executable and the bootstrap script
+     * from the command-line arguments and launches it as a subprocess.
+     */
     // Initializes the toolkit engine by reading the argument passed by the
     // startup module in the command line. The argument is in the form of an
     // url parameters and contains the location to python, the location to the
     // bootstrap engine and the port to use for the server<->client connection.
     var args = Qt.application.arguments[1];
-    var query = getQueryParams(args);
+    const query = getQueryParams(args);
 
-    var sgtk_substancepainter_engine_startup = '"' + query.SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP+ '"'
-    var sgtk_substancepainter_engine_python = '"' + query.SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON + '"'
+    const sgtk_substancepainter_engine_startup = '"' + query.SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP+ '"'
+    const sgtk_substancepainter_engine_python = '"' + query.SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON + '"'
     
     log_debug("Starting tk-substancepainter engine with params: " + sgtk_substancepainter_engine_python + " " + sgtk_substancepainter_engine_startup)
     alg.subprocess.start(sgtk_substancepainter_engine_python + " " + sgtk_substancepainter_engine_startup, onProcessEndedCallback)
   }
 
-  function checkConnection(data) 
-  {
-      // TODO: check if the subprocess where the engine is running is still alive.
-      // Might not be needed as if we use a callback in the start of the process
-      // that tell us when the process is finished, and also the server knows
-      // when the client drops it's connection.
-  }
-
   function displayMenu(data) 
   {
+    /**
+     * Sends a command to the Python engine to display the main FlowPTR menu.
+     * It includes the position where the user clicked the toolbar button.
+     */
     // tells the engine to show the menu
     server.sendCommand("DISPLAY_MENU", {clickedPosition: root.openMenuButton.clickedPosition});
   }
 
  function sendProjectInfo() 
  {
+    // Sends information about the current project to the client.
     try
     {
         server.sendCommand("OPENED_PROJECT_INFO", {
@@ -213,14 +227,20 @@ PainterPlugin
 
   function disconnect() 
   {
+    /**
+     * Called when the WebSocket connection is lost. It attempts to restart the engine.
+     */
     root.isEngineLoaded = false;
 
-    log_warning("Shotgun Substance Painter Engine connection was lost. Reconnecting ...");
+    log_warning("FlowPTR Engine connection was lost. Reconnecting ...");
     bootstrapEngine();
   }
 
   function getVersion(data) 
   {
+    /**
+     * Callback to get the version of Substance 3D Painter and its API.
+     */
     return {
              painter: alg.version.painter,
              api: alg.version.api
@@ -229,6 +249,10 @@ PainterPlugin
   
   function engineReady(data) 
   {
+    /**
+     * Callback executed when the Python engine signals that it is fully initialized.
+     * This enables the UI and synchronizes the project context.
+     */
     log_info("Engine is ready.")  
     root.isEngineLoaded = true;
     
@@ -238,11 +262,18 @@ PainterPlugin
 
   function cleanUrl(url) 
   {
+    /**
+     * Normalizes a file URL to a consistent format for comparison.
+     */
     return alg.fileIO.localFileToUrl(alg.fileIO.urlToLocalFile(url));
   }
 
   function openProject(data) 
   {
+    /**
+     * Callback to open a Substance 3D Painter project from a given file path.
+     * It handles checking for unsaved changes in the current project.
+     */
     var projectOpened = alg.project.isOpen();
     var isAlreadyOpen = false;
 
@@ -262,11 +293,20 @@ PainterPlugin
     {
       if (!isAlreadyOpen)
       {
-        if (projectOpened)
+        if (projectOpened && alg.project.needSaving())
         {
-          // TODO: Ask the user if he wants to save its current opened project
-          alg.project.close();
-        }    
+          // Ask the user if they want to save their current opened project
+          saveChangesDialog.open();
+          // The dialog will handle closing and opening the new project.
+          // Store the URL to open in a property on the dialog.
+          saveChangesDialog.nextProjectUrl = url;
+          return true; // Stop execution here, dialog will continue.
+        }
+        else if (projectOpened)
+        {
+            // Project is open but has no changes, so just close it.
+            alg.project.close();
+        }
         alg.project.open(url);
       }
     }
@@ -281,6 +321,9 @@ PainterPlugin
 
   function currentProjectPath(data)
   {
+    /**
+     * Callback to get the file path of the currently open project.
+     */
     try 
     {
       var projectOpened = alg.project.isOpen();
@@ -302,6 +345,9 @@ PainterPlugin
 
   function currentProjectMesh(data)
   {
+    /**
+     * Callback to get the file path of the mesh used in the current project.
+     */
     try
     {
       var projectOpened = alg.project.isOpen();
@@ -324,6 +370,9 @@ PainterPlugin
   
   function saveProjectAs(data)
   {
+    /**
+     * Callback to save the current project to a new file path.
+     */
     try
     {
       var url = alg.fileIO.localFileToUrl(data.path);
@@ -341,6 +390,9 @@ PainterPlugin
 
   function saveProject(data)
   {
+    /**
+     * Callback to save the current project.
+     */
     try
     {
       alg.project.save("", alg.project.SaveMode.Full);
@@ -356,6 +408,9 @@ PainterPlugin
 
   function needsSavingProject(data)
   {
+    /**
+     * Callback to check if the current project has unsaved changes.
+     */
     try
     {
       return alg.project.needSaving();
@@ -371,6 +426,9 @@ PainterPlugin
 
   function closeProject(data)
   {
+    /**
+     * Callback to close the current project.
+     */
     try
     {
       var projectOpened = alg.project.isOpen();
@@ -387,6 +445,9 @@ PainterPlugin
 
   function executeStatement(data)
   {
+    /**
+     * Callback to execute an arbitrary JavaScript statement.
+     */
     try
     {
       return eval(data.statement);
@@ -402,6 +463,11 @@ PainterPlugin
 
   function importProjectResource(data)
   {
+    /**
+     * Callback to import a file as a project resource (e.g., a texture).
+     * It also stores metadata in the project settings to track that this
+     * resource was loaded via the Toolkit Loader.
+     */
     try
     {
       var result = alg.resources.importProjectResource(data.path, [data.usage], data.destination);
@@ -427,11 +493,18 @@ PainterPlugin
 
   function getProjectSettings(data)
   {
+    /**
+     * Callback to retrieve a value from the project's metadata settings.
+     */
     return alg.project.settings.value(data.key, {});
   }
 
   function getResourceInfo(data)
   {
+    /**
+     * Callback to get information about a specific project resource,
+     * identified by its URL.
+     */
     try
     {
       return alg.resources.getResourceInfo(data.url);
@@ -446,16 +519,25 @@ PainterPlugin
 
   function getProjectExportPath(data)
   {
+    /**
+     * Callback to get the default export path for the current project.
+     */
     return alg.mapexport.exportPath();
   }
 
   function saveProjectAsAction(data)
   {
+    /**
+     * Callback to trigger the native 'Save As' dialog.
+     */
     return saveSessionDialog.open();
   }
 
   function getMapExportInformation(data)
   {
+    /**
+     * Callback to get a list of maps that would be exported with the current settings.
+     */
     var export_preset = alg.mapexport.getProjectExportPreset();
     var export_options = alg.mapexport.getProjectExportOptions();
     var export_path = alg.mapexport.exportPath();
@@ -464,6 +546,10 @@ PainterPlugin
 
   function exportDocumentMaps(data)
   {
+    /**
+     * Callback to start the texture export process. This is an asynchronous
+     * operation, so it sends events back to the engine when it starts and finishes.
+     */
     var export_preset = alg.mapexport.getProjectExportPreset();
     var export_options = alg.mapexport.getProjectExportOptions();
     var export_path = data.destination;
@@ -475,16 +561,26 @@ PainterPlugin
 
   function updateDocumentResources(data)
   {
+    /**
+     * Callback to replace all usages of one resource with another.
+     * Used by the Breakdown app.
+     */
     return alg.resources.updateDocumentResources(data.old_url, data.new_url);
   }
 
   function documentResources(data)
   {
+    /**
+     * Callback to get a list of all resources currently in use in the project.
+     */
     return alg.resources.documentResources();
   }
 
   function toggleDebugLogging(data)
   {
+    /**
+     * Callback to enable or disable debug logging for this plugin.
+     */
     alg.log.debug("Debug Logging is : " + data.enabled);
     root.debug = data.enabled;
     server.debug = data.enabled;
@@ -492,6 +588,7 @@ PainterPlugin
 
   CommandServer
   {
+    // This is the WebSocket server instance.
     id: server
     Component.onCompleted:
     {
@@ -526,6 +623,7 @@ PainterPlugin
 
     onConnectedChanged: 
     {
+      // If the client disconnects, trigger the reconnect logic.
       if (!connected)
       {
         disconnect();
@@ -535,6 +633,7 @@ PainterPlugin
 
   FileDialog
   {
+    // A standard file dialog used for the 'Save As' action.
     id: saveSessionDialog
     title: "Save Project"
     selectExisting : false
@@ -550,5 +649,32 @@ PainterPlugin
     {
       return false;
     }
+  }
+
+  MessageDialog {
+      // A standard message dialog used to ask the user to save changes
+      // before opening a new project, preventing data loss.
+      id: saveChangesDialog
+      title: "Save Changes?"
+      text: "The current project has unsaved changes. Do you want to save them before opening the new project?"
+      icon: StandardIcon.Question
+      standardButtons: StandardButton.Save | StandardButton.Discard | StandardButton.Cancel
+      property var nextProjectUrl: ""
+
+      onButtonClicked: (button) => {
+          if (button === StandardButton.Save) {
+              alg.project.save();
+              alg.project.close();
+              alg.project.open(nextProjectUrl);
+          } else if (button === StandardButton.Discard) {
+              alg.project.close();
+              alg.project.open(nextProjectUrl);
+          }
+          // If 'Cancel', do nothing.
+      }
+
+      onVisibleChanged: {
+          if (!visible) nextProjectUrl = ""; // Clear the URL when dialog is closed
+      }
   }
 }
