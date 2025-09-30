@@ -45,7 +45,7 @@ tk-substancepainter releases
 engines.tk-substancepainter.location:
   type: git
   path: https://github.com/StephenAnimates/tk-substancepainter
-  version: v2.0.1
+  version: v2.0.2
 ```
 
 Or in your environments you should add tk-substancepainter yml file, for example in the asset_step yml file:

@@ -26,4 +26,4 @@ engines.tk-substancepainter.location:
   type: git
   branch: master
   path: https://github.com/StephenAnimates/tk-substancepainter
-  version: v2.0.1
+  version: v2.0.2
