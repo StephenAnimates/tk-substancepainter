@@ -141,7 +141,7 @@ tk-substancepainter releases
 engines.tk-substancepainter.location:
   type: git
   path: https://github.com/StephenAnimates/tk-substancepainter
-  version: v2.0.3
+  version: v2.0.4
 ```
 
 ### 2. Set up the Project Environment
