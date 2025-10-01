@@ -1,0 +1,6 @@
+.gitignore
+.github/FUNDING.yml
+tk-substancepainter.code-workspace
+config/images/advanced_project_setup.png
+config/images/create_new_software.png
+config/images/define_storages.png
