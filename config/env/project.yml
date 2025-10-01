@@ -9,22 +9,11 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 #
 
-# Original code by: Diego Garcia Huerta, https://www.linkedin.com/in/diegogh/
-# Updated by: Stephen Studyvin
-
-# Updated:
-# September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
-#
-# MERGE the entries below into the project's project.yml config file
-# THIS FILE BY ITSELF WILL NOT WORK
-# These are the additions to get substancepainter engine up and running
-# with the default tk-config-basic project.
-
-# Adobe Substance 3D Painter
+# This file is the main configuration for the project environment. It includes
+# the engine and app settings for all integrations running in this context.
 
 includes:
-  # Include the main settings file for the Substance 3D Painter integration.
-  - ./includes/substancepainter/settings.yml
+  - ./includes/substancepainter/project.yml
 
 engines:
   tk-substancepainter: "@substancepainter.project"

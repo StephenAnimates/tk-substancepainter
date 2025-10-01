@@ -1,0 +1,68 @@
+
+templates:
+    #
+    # Adobe Substance 3D Painter
+    #
+
+    # The keys section contains the definitions for all the different keys that are being
+    # used in the Toolkit. A key is a magic token that is replaced by a value at runtime, for example
+    # {Shot}. The section below tells the Toolkit which data types and formats to expect for each key.
+    keys:
+        texture_extension:
+            type: str
+            alias: extension
+
+        texture_name:
+            type: str
+
+    # The paths section contains all the the key locations where files are to be stored
+    # by the Toolkit Apps. Each path is made up of several keys (like {version} or {shot}) and
+    # these are defined in the keys section above.
+    #
+    # Toolkit apps use these paths as part of their configuration to define where on disk
+    # different files should go.
+
+    paths:
+        #
+        # Adobe Substance 3D Painter
+        #
+
+        # asset
+        # define the location of a work area
+        asset_work_area_substancepainter:
+            definition: '@asset_root/work/substancepainter'
+            root_name: 'primary'
+        # define the location of a publish area
+        asset_publish_area_substancepainter:
+            definition: '@asset_root/publish/substancepainter'
+            root_name: 'primary'
+
+        # The location of WIP files
+        substancepainter_asset_work:
+            definition: '@asset_work_area_substancepainter/{name}.v{version}.spp'
+            root_name: 'primary'
+
+        # The location of backups of WIP files
+        substancepainter_asset_snapshot:
+            definition: '@asset_work_area_substancepainter/snapshots/{name}.v{version}.{timestamp}.spp'
+            root_name: 'primary'
+
+        # The folder where the textures are exported for a project
+        substancepainter_asset_textures_path_export:
+            definition: '@asset_work_area_substancepainter/export'
+            root_name: 'primary'
+
+        # The location of published Adobe Substance 3D Painter files
+        substancepainter_asset_publish:
+            definition: '@asset_publish_area_substancepainter/{name}.v{version}.spp'
+            root_name: 'primary'
+
+        # The Adobe Substance 3D Painter texture folder publish
+        substancepainter_asset_textures_path_publish:
+            definition: '@asset_publish_area_substancepainter/textures/{Asset}_textures_v{version}'
+            root_name: 'primary'
+
+        # A texture folder publish
+        substancepainter_asset_texture_path_publish:
+            definition: '@asset_publish_area_substancepainter/textures/{Asset}_{texture_name}_v{version}.{texture_extension}'
+            root_name: 'primary'

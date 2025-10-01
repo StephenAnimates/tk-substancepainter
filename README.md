@@ -147,12 +147,12 @@ engines.tk-substancepainter.location:
 ### 2. Set up the Project Environment
 
 Next, you need to tell Toolkit which apps to run inside Substance 3D Painter.
-
-1.  In your pipeline configuration, create a new folder: `config/env/includes/substancepainter`.
-2.  Copy the `settings.yml` file from this repository's `config/env/includes/substancepainter` folder into your new folder. This file contains all the necessary app configurations.
-
-    *   **Source**: `tk-substancepainter/config/env/includes/substancepainter/settings.yml`
-    *   **Destination**: `<your-pipeline-config>/config/env/includes/substancepainter/settings.yml`
+ 
+1.  In your pipeline configuration, create a new folder for the integration: `config/env/includes/substancepainter`.
+2.  Copy the contents of this repository's `config/env/includes/substancepainter` folder (which includes `apps.yml`, `asset_step.yml`, `project.yml`, etc.) into your new folder.
+ 
+    *   **Source**: `tk-substancepainter/config/env/includes/substancepainter/*`
+    *   **Destination**: `<your-pipeline-config>/config/env/includes/substancepainter/`
 
 3.  Now, open the environment files where you want to enable Substance 3D Painter (e.g., `config/env/asset_step.yml`, `config/env/project.yml`) and add the following lines:
 
@@ -161,7 +161,7 @@ Next, you need to tell Toolkit which apps to run inside Substance 3D Painter.
 
 includes:
 # Add this line
-- includes/substancepainter/settings.yml
+- includes/substancepainter/asset_step.yml
 
 engines:
   # Add this block
@@ -174,7 +174,7 @@ engines:
 
 includes:
 # Add this line
-- includes/substancepainter/settings.yml
+- includes/substancepainter/project.yml
 
 engines:
   # Add this block

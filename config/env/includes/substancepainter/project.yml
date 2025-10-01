@@ -1,0 +1,52 @@
+# Copyright (c) 2016 Shotgun Software Inc.
+#
+# CONFIDENTIAL AND PROPRIETARY
+#
+# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit
+# Source Code License included in this distribution package. See LICENSE.
+# By accessing, using, copying or modifying this work you indicate your
+# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
+# not expressly granted therein are reserved by Shotgun Software Inc.
+#
+
+# This file configures the Substance 3D Painter engine for the project environment.
+
+includes:
+- ../common/engines.yml
+- ../common/apps.yml
+- apps.yml
+
+substancepainter.project:
+  apps:
+    tk-multi-about: "@common.apps.tk-multi-about"
+
+    tk-multi-publish2: '@maya.apps.tk-multi-publish2'
+
+    tk-multi-screeningroom: "@common.apps.tk-multi-screeningroom"
+
+    tk-multi-loader2: '@maya.apps.tk-multi-loader2'
+
+    tk-multi-shotgunpanel: "@common.apps.tk-multi-shotgunpanel"
+
+    tk-multi-workfiles2: # This app has custom settings, so it's defined in apps.yml
+      allow_task_creation: true
+      create_new_task_hook: "{self}/create_new_task.py"
+      custom_actions_hook: "{self}/custom_actions.py"
+      entities:
+      - caption: Assets
+        entity_type: Task
+        filters:
+        - [entity, type_is, Asset]
+        hierarchy: [entity.Asset.sg_asset_type, entity, step, content]
+      - caption: Shots
+        entity_type: Task
+        filters:
+        - [entity, type_is, Shot]
+        hierarchy: [entity.Shot.sg_sequence, entity, step, content]
+      location: "@apps.tk-multi-workfiles2.location" # Location is defined in common/apps.yml
+    tk-multi-pythonconsole: "@common.apps.tk-multi-pythonconsole"
+  menu_favourites:
+  - {app_instance: tk-multi-workfiles2, name: File Open...}
+  location: "@engines.tk-substancepainter.location"
+  run_at_startup:
+  - {app_instance: tk-multi-shotgunpanel, name: ''}

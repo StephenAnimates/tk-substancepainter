@@ -10,7 +10,8 @@
 #
 
 includes:
-- includes/substancepainter/settings.yml
+- ./includes/common/engines.yml
+- ./includes/substancepainter/asset.yml
 
 engines:
   tk-substancepainter: "@substancepainter.asset"

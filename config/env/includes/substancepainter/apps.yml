@@ -1,0 +1,118 @@
+# Copyright (c) 2017 Shotgun Software Inc.
+#
+# CONFIDENTIAL AND PROPRIETARY
+#
+# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit
+# Source Code License included in this distribution package. See LICENSE.
+# By accessing, using, copying or modifying this work you indicate your
+# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
+# not expressly granted therein are reserved by Shotgun Software Inc.
+#
+
+# This file defines the app configurations for the Adobe Substance 3D Painter engine.
+# It is included by the environment-specific settings files.
+
+includes:
+- ../common/apps.yml
+- ../common/settings/tk-multi-publish2.yml
+
+
+substancepainter.apps.tk-multi-publish2:
+  help_url: "@common.apps.tk-multi-publish2.help_url"
+  collector: "{self}/collector.py:{engine}/tk-multi-publish2/basic/collector.py"
+  collector_settings:
+      Work Template: substancepainter_asset_work
+      Work Export Template: substancepainter_asset_textures_path_export
+      Publish Textures as Folder: true
+  publish_plugins:
+  - name: Publish to Flow Production Tracking
+    hook: "{self}/publish_file.py"
+    settings: {}
+  - name: Publish to Flow Production Tracking
+    hook: "{self}/publish_file.py:{engine}/tk-multi-publish2/basic/publish_textures.py"
+    settings:
+      Publish Template: substancepainter_asset_textures_path_publish
+  - name: Publish to Flow Production Tracking
+    hook: "{self}/publish_file.py:{engine}/tk-multi-publish2/basic/publish_texture.py"
+    settings:
+      Publish Template: substancepainter_asset_texture_path_publish
+  - name: Upload for review
+    hook: "{self}/upload_version.py"
+    settings: {}
+  - name: Begin file versioning
+    hook: "{engine}/tk-multi-publish2/basic/start_version_control.py"
+    settings: {}
+  - name: Publish to Flow Production Tracking
+    hook: "{self}/publish_file.py:{engine}/tk-multi-publish2/basic/publish_session.py"
+    settings:
+        Publish Template: substancepainter_asset_publish
+  location: "@common.apps.tk-multi-publish2.location"
+
+substancepainter.apps.tk-multi-loader2:
+  action_mappings:
+    Image: [Import Project Resource as texture]
+    Texture: [Import Project Resource as texture]
+    Rendered Image: [Import Project Resource as texture]
+    Substance Material Preset: [Import Project Resource as preset]
+    Sppr File: [Import Project Resource as preset]
+    PopcornFX: [Import Project Resource as script]
+    Pkfx File: [Import Project Resource as script]
+    Shader: [Import Project Resource as shader]
+    Glsl File: [Import Project Resource as shader]
+    Substance Export Preset: [Import Project Resource as export]
+    Spexp File: [Import Project Resource as export]
+    Substance Smart Material: [Import Project Resource as smartmaterial]
+    Spsm File: [Import Project Resource as smartmaterial]
+    Substance File: [Import Project Resource as basematerial]
+    Sbsar File: [Import Project Resource as basematerial]
+    Substance Smart Mask: [Import Project Resource as smartmask]
+    Spmsk File: [Import Project Resource as smartmask]
+  actions_hook: "{engine}/tk-multi-loader2/tk-substancepainter_actions.py"
+  entities:
+  - caption: Current Project
+    type: Hierarchy
+    root: "{context.project}"
+    publish_filters: []
+  - caption: My Tasks
+    type: Query
+    entity_type: Task
+    filters:
+    - [project, is, '{context.project}']
+    - [task_assignees, is, '{context.user}']
+    hierarchy: [entity, content]
+  # ignore publishes without a status. with zero config, it is very easy
+  # to publish the same path multiple times. the default zero config publish
+  # plugins will clear the status of previous publishes of the same path.
+  # this filter means only the latest publish will be displayed.
+  publish_filters: [["sg_status_list", "is_not", null]]
+  location: "@apps.tk-multi-loader2.location"
+
+substancepainter.apps.tk-multi-snapshot:
+  hook_scene_operation: "{engine}/tk-multi-snapshot/scene_operation_tk-substancepainter.py"
+  template_snapshot: substancepainter_asset_snapshot
+  location: "@apps.tk-multi-snapshot.location"
+
+substancepainter.apps.tk-multi-workfiles2:
+  allow_task_creation: false
+  # create_new_task_hook: "{self}/create_new_task.py"
+  custom_actions_hook: "{self}/custom_actions.py"
+  hook_copy_file: "{self}/copy_file.py"
+  hook_filter_publishes: default
+  hook_filter_work_files: default
+  hook_scene_operation: "{engine}/tk-multi-workfiles2/scene_operation_tk-substancepainter.py"
+  template_publish: substancepainter_asset_publish
+  template_publish_area: asset_publish_area_substancepainter
+  template_work: substancepainter_asset_work
+  template_work_area: asset_work_area_substancepainter
+  location: "@apps.tk-multi-workfiles2.location"
+  entities:
+  - caption: Assets
+    entity_type: Task
+    filters:
+    - [entity, type_is, Asset]
+    hierarchy: [entity.Asset.sg_asset_type, entity, step, content]
+  file_extensions: []
+
+substancepainter.apps.tk-multi-breakdown:
+  hook_scene_operations: "{engine}/tk-multi-breakdown/tk-substancepainter_scene_operations.py"
+  location: "@apps.tk-multi-breakdown.location"
