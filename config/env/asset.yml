@@ -9,12 +9,8 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 #
 
-# This file shows how to enable the Substance 3D Painter engine in the
-# asset environment for a tk-config-basic project.
-
 includes:
-  # Include the main settings file for the Substance 3D Painter integration.
-  - ./includes/settings/tk-substancepainter.yml
+- includes/substancepainter/settings.yml
 
 engines:
   tk-substancepainter: "@settings.tk-substancepainter.asset"

@@ -9,12 +9,22 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 #
 
-# This file shows how to enable the Substance 3D Painter engine in the
-# project environment for a tk-config-basic project.
+# Original code by: Diego Garcia Huerta, https://www.linkedin.com/in/diegogh/
+# Updated by: Stephen Studyvin
+
+# Updated:
+# September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
+#
+# MERGE the entries below into the project's project.yml config file
+# THIS FILE BY ITSELF WILL NOT WORK
+# These are the additions to get substancepainter engine up and running
+# with the default tk-config-basic project.
+
+# Adobe Substance 3D Painter
 
 includes:
   # Include the main settings file for the Substance 3D Painter integration.
-  - ./includes/settings/tk-substancepainter.yml
+  - ./includes/substancepainter/settings.yml
 
 engines:
   tk-substancepainter: "@settings.tk-substancepainter.project"

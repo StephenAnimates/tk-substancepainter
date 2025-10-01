@@ -33,10 +33,10 @@ This guide provides instructions for setting up this engine with a modern, `tk-c
 
 ### 1. Download the Engine Code
 
-The first step is to tell your Toolkit project where to find the engine code. In your pipeline configuration, open the `config/core/engine_locations.yml` file and add a block that points to this GitHub repository.
+The first step is to tell your Toolkit project where to find the engine code.
+Move the `engine_locations.yml` from the repo `config/core` to the pipeline configuration's `config/core` directory.
 
-**Make sure to check for the latest version of the engine** here and use the version number in the version section below:
-tk-substancepainter releases
+**Make sure to check for the latest version of the engine** here and use the version number in the version section, for example:
 
 ```
 # config/core/engine_locations.yml
@@ -47,67 +47,93 @@ engines.tk-substancepainter.location:
   path: https://github.com/StephenAnimates/tk-substancepainter
   version: v2.0.2
 ```
+-------------------------------------------------------------------------------------
 
-Or in your environments you should add tk-substancepainter yml file, for example in the asset_step yml file:
-``env/asset_step.yml``
+### 2. Set up the Project Environment
 
-Add the include at the beginning of the file, in the 'includes' section:
-```
-includes/settings/tk-substancepainter.yml
+Next, you need to tell Toolkit which apps to run inside Adobe Substance 3D Painter.
+ 
+1.  In your pipeline configuration, create a new folder for the integration: `config/env/includes/substancepainter`.
+2.  Copy the `settings.yml` file from this repository into your new folder. This file contains all the necessary app configurations.
+ 
+    *   **Source**: `tk-substancepainter/config/env/includes/substancepainter/settings.yml`
+    *   **Destination**: `<your-pipeline-config>/config/env/includes/substancepainter/settings.yml`
+
+3.  Open the `config/env/asset_step.yml` environment file and add the following lines:
+
+```yaml
+# config/env/asset_step.yml
+# ~/Library/Caches/Shotgun/bundle_cache/app_store/tk-config-basic/v1.7.5/env
+
+includes:
+- includes/substancepainter/settings.yml
+
+engines:
+  tk-substancepainter: "@substancepainter.settings"
+
+# ... rest of the file
 ```
 
-Add to project.yml, includes:
-```
-- ./includes/settings/tk-substancepainter.yml
-```
-Then to engines:
-```
-  tk-substancepainter: "@settings.tk-substancepainter.project"
+5. Open the `config/env/project.yml` environment file and add the following lines:
+
+```yaml
+
+includes:
+- includes/substancepainter/settings.yml
+
+engines:
+  tk-substancepainter: "@substancepainter.settings"
 ```
 
-``~/Library/Caches/Shotgun/bundle_cache/app_store/tk-config-basic/v1.7.5/env/project.yml``
+**Note**: The `asset_step.yml`, `project.yml` from the repo's `config/env/includes` folder contain these code snippets as well, so you can merge them into the project configuration files.
 
-Now we add a new entry under the engines section, that will include all the information for our Adobe Substance 3D Painter application:
-```
-yaml
-tk-substancepainter: "@settings.tk-substancepainter.asset_step"
-```
+### 3. Add Templates
 
-Finally, do not forget to copy the additional `tk-substancepainter.yml` into your settings folder.
+Merge the contents of this repo's `config/core/templates.yml` file into your pipeline configuration's `config/core/templates.yml`. This adds the necessary file system paths for Substance 3D Painter work files and publishes.
 
-## Modifying the Templates
+*   templates.yml additions for this engine
 
-The additions to `config/core/templates.yml` are provided also under the config directory of this repository, specifically `templates.yml`
-This repository's `config` folder contains a self-contained settings file (`config/env/includes/settings/tk-substancepainter.yml`) designed for a modern `tk-config-basic` setup. Follow the steps in the Engine Installation section to integrate it into your project.
+This repository's `config` folder contains a self-contained settings file (`config/env/includes/substancepainter/settings.yml`) designed for a modern `tk-config-basic` setup. Follow the steps in the **Engine Installation** section to integrate it into your project.
 
 ## Configuring Adobe Substance 3D Painter in the software launcher
 
 In order for our application to show up in the FlowPTR launcher, we need to add it to our list of software that is valid for this project.
 
-1. Open the FlowPTR site, for example `example.shotgrid.autodesk.com`, after logging in, clink in the **FlowPTR Settings** menu, the arrow at the top right of the page (your user picture). 
-2. Click the **Software** option
+1. Open the FlowPTR site, for example `example.shotgrid.autodesk.com`, after logging in, clink in the **FlowPTR Settings** menu, the arrow at the top right of the page (your user picture).
+2. Click **Software**
 !select_a_project_configuration
-3. Create a new entry for the software, called "Adobe Substance 3D Painter".
+3. Create a new entry for the software by clicking the Add Software button.
 !create_new_software
-4. Specify the engine this software will use: "tk-substancepainter"
+4. Enter ``Subs Painter`` in the **Software Name** field - You can use any name you want to appear in the Desktop app, but longer names will not display well.
+5. Enter ``Adobe Substance 3D Painter`` and other details in the **Description** field.
+6. Enter ``tk-substancepainter`` in the **Engine** field.
 !software_specify_engine
+7. If you need to add information to other fields, look over the [Configuring software launches documentation](https://help.autodesk.com/view/SGDEV/ENU/?guid=SGD_pg_integrations_admin_guides_integrations_admin_guide_html#configuring-software-launches)
 
-* Note: Restrict the software to certain projects by entering the project in the projects column. If no projects are specified this application will show up for all the projects that have this engine in their configuration files.
-
-If you want more information on how to configure software launches, here is the detailed documentation from FlowPTR.
-[Configuring software launches](https://support.shotgunsoftware.com/hc/en-us/articles/115000067493#Configuring%20the%20software%20in%20Shotgun%20Desktop)
-
+**Note**: If you want to restrict the software to certain projects enter the name of the project in the projects column. If no projects are specified this application will show up for all the projects that have this engine in their configuration files. It is recommended to restrict this to a test or Sandbox project to make sure it's working before making it available to live projects.
 
 ## Caching and downloading the engine into disk
 
-One last step is to cache the engine and apps from the configuration files into disk. FlowPTR provides a tank command for this. 
+The last step is to cache the engine and apps from the configuration files into disk. FlowPTR provides a tank command for this. 
 [Tank Advanced Commands](https://help.autodesk.com/view/SGDEV/ENU/?guid=SGD_pg_integrations_admin_guides_advanced_toolkit_administration_html#advanced-tank-commands)
 
 1. Open a **Command** window or **Terminal** and navigate to your pipeline configuration folder, where you will find a `tank` or `tank.bat` file.
 (in our case we placed the pipeline configuration under `D:\demo\configs\game_config`)
 2. Type `tank cache_apps` , and press the **Enter/Return** key.
 
+"This command will traverse the entire configuration and ensure that all apps and engines code is correctly cached in your local installation."
 FlowPTR Toolkit will start revising the changes we have done to the configuration yml files and downloading what is requires.
+
+
+ERROR: Include resolve error in
+'/Users/stephenstudyvin/Library/Caches/Shotgun/bundle_cache/app_store/tk-config-basic/v1.7.5/env/project.yml':
+'includes/settings/tk-substancepainter.yml' resolved to
+'/Users/stephenstudyvin/Library/Caches/Shotgun/bundle_cache/app_store/tk-config-basic/v1.7.5/env/includes/settings/tk-substancepainter.yml'
+which does not exist!
+
+
+
+
 
 ![tank_cache_apps](config/images/tank_cache_apps.png)
 
@@ -119,25 +145,7 @@ FlowPTR Toolkit will start revising the changes we have done to the configuratio
 **Warning:** if you recieve an error message
     [error_project_setup](config/images/error_project_setup.png)
 
-"You are trying to set up a project which has already been set up":
-
-Update the engine
-
-1. Go back to the **Command** or **Terminal** window
-2. Navigate to the tank command in the project
-```cd ~/Library/Caches/Shotgun/<site>/p<project id>.basic.desktop/cfg/```
-```
-tank updates [environment_name] [engine_name] [app_name] [--use-legacy-yaml] [--external='/path/to/config']
-```
-Example:
-```
-~/Library/Caches/Shotgun/<site>/site.basic.desktop/cfg/
-~/Library/Caches/Shotgun/djcad/site.basic.desktop/cfg/tank install_app tk-substancepainter https://github.com/StephenAnimates/tk-substancepainter.git
-
-```
-
-Alternatively, you can update the entire site.
-```tank updates```
+"You are trying to set up a project which has already been set up"
 
 ## Adobe Substance 3D Painter engine should be ready to use
 
@@ -206,10 +214,9 @@ settings.tk-substancepainter.asset_step:
 ## [tk-multi-breakdown](https://support.shotgunsoftware.com/hc/en-us/articles/219032988)
 ![tk-substancepainter_02](config/images/tk-substancepainter_02.PNG)
 
-The Scene Breakdown App shows you a list of items you have loaded (referenced) in your scene and tells you which ones are out of date. From this overview, you can select multiple objects and click the update button which will update all your selected items to use the latest published version.
+The **Scene Breakdown App** shows you a list of items you have loaded (referenced) in your scene and tells you which ones are out of date. From this overview, you can select multiple objects and click the update button which will update all your selected items to use the latest published version.
 
-Note that this tool will only update the resources that have been loaded previously trough the Loader toolkit app.
-
+**Note**: this tool will only update the resources that have been loaded previously trough the Loader toolkit app.
 It also displays what textures loaded from the Loader app are in used within the scene and which ones are not. The tidying up of the shelf resources is left for the user.
 
 Credits:

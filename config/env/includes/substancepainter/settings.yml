@@ -7,10 +7,14 @@
 # By accessing, using, copying or modifying this work you indicate your
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
-#
 
-# Author: Diego Garcia Huerta
-# Contact: https://www.linkedin.com/in/diegogh/
+# Original code by: Diego Garcia Huerta, https://www.linkedin.com/in/diegogh/
+# Updated by: Stephen Studyvin
+
+# Updated:
+# September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
+
+# Adobe Substance 3D Painter
 
 ################################################################################
 
