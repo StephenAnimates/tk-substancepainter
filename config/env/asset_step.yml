@@ -13,4 +13,4 @@ includes:
 - includes/substancepainter/settings.yml
 
 engines:
-  tk-substancepainter: "@settings.tk-substancepainter.asset_step"
+  tk-substancepainter: "@substancepainter.asset_step"
