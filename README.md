@@ -126,6 +126,7 @@ If you haven't done it yet, make sure you have gone through the basic steps to c
 
 ![select_deployment](config/images/select_deployment.png)
 
+
 ### 1. Download the Engine Code
 
 The toolkit project configuration needs to be updated with the Adobe Substance 3D Painter engine information. In your pipeline configuration's `config/env/includes/common` directory, open the existing `engines.yml` file. Add the following block to this file, which points the toolkit to this GitHub repository.
@@ -182,6 +183,7 @@ engines:
 # ... rest of the file
 ```
 
+
 ### 6. Caching and downloading the engine into disk
 
 One last step is to cache the engine and apps from the configuration files into disk. FlowPTR provides a tank command for this. 
@@ -193,6 +195,7 @@ One last step is to cache the engine and apps from the configuration files into 
 * type `tank cache_apps` , and press the Enter key. FlowPTR Toolkit will start revising the changes we have done to the configuration yml files and downloading what is requires.
 
 ![tank_cache_apps](config/images/tank_cache_apps.png)
+
 
 ## Adobe Substance 3D Painter engine should be ready to use
 
@@ -252,7 +255,6 @@ settings.tk-multi-publish2.substancepainter.asset_step:
       Work Template: substancepainter_asset_work
       **Publish Textures as Folder: true**
 ```
-
 
 ## [tk-multi-breakdown](https://support.shotgunsoftware.com/hc/en-us/articles/219032988)
 ![tk-substancepainter_02](config/images/tk-substancepainter_02.PNG)
