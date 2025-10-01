@@ -14,11 +14,41 @@
 
 includes:
 - ../common/apps.yml
-- ../common/settings/tk-multi-publish2.yml
 
+substancepainter.apps.tk-multi-workfiles2:
+  allow_task_creation: false
+  # create_new_task_hook: "{self}/create_new_task.py"
+  custom_actions_hook: "{self}/custom_actions.py"
+  hook_copy_file: "{self}/copy_file.py"
+  hook_filter_publishes: default
+  hook_filter_work_files: default
+  hook_scene_operation: "{engine}/tk-multi-workfiles2/scene_operation_tk-substancepainter.py"
+  template_publish: substancepainter_asset_publish
+  template_publish_area: asset_publish_area_substancepainter
+  template_work: substancepainter_asset_work
+  template_work_area: asset_work_area_substancepainter
+  location: "@common.apps.tk-multi-workfiles2.location"
+  entities:
+  - caption: Assets
+    entity_type: Task
+    filters:
+    - [entity, type_is, Asset]
+    hierarchy: [entity.Asset.sg_asset_type, entity, step, content]
+  file_extensions: []
+
+substancepainter.apps.tk-multi-workfiles2.project:
+  allow_task_creation: true
+  create_new_task_hook: "{self}/create_new_task.py"
+  custom_actions_hook: "{self}/custom_actions.py"
+  entities:
+  - caption: Assets
+    entity_type: Task
+    filters:
+    - [entity, type_is, Asset]
+    hierarchy: [entity.Asset.sg_asset_type, entity, step, content]
+  location: "@common.apps.tk-multi-workfiles2.location"
 
 substancepainter.apps.tk-multi-publish2:
-  help_url: "@common.apps.tk-multi-publish2.help_url"
   collector: "{self}/collector.py:{engine}/tk-multi-publish2/basic/collector.py"
   collector_settings:
       Work Template: substancepainter_asset_work
@@ -85,34 +115,14 @@ substancepainter.apps.tk-multi-loader2:
   # plugins will clear the status of previous publishes of the same path.
   # this filter means only the latest publish will be displayed.
   publish_filters: [["sg_status_list", "is_not", null]]
-  location: "@apps.tk-multi-loader2.location"
+  location: "@common.apps.tk-multi-loader2.location"
 
-substancepainter.apps.tk-multi-snapshot:
-  hook_scene_operation: "{engine}/tk-multi-snapshot/scene_operation_tk-substancepainter.py"
-  template_snapshot: substancepainter_asset_snapshot
-  location: "@apps.tk-multi-snapshot.location"
+substancepainter.apps.tk-multi-breakdown2:
+  hook_scene_operations: "{engine}/tk-multi-breakdown2/tk-substancepainter_scene_operations.py"
+  location: "@common.apps.tk-multi-breakdown2.location"
 
-substancepainter.apps.tk-multi-workfiles2:
-  allow_task_creation: false
-  # create_new_task_hook: "{self}/create_new_task.py"
-  custom_actions_hook: "{self}/custom_actions.py"
-  hook_copy_file: "{self}/copy_file.py"
-  hook_filter_publishes: default
-  hook_filter_work_files: default
-  hook_scene_operation: "{engine}/tk-multi-workfiles2/scene_operation_tk-substancepainter.py"
-  template_publish: substancepainter_asset_publish
-  template_publish_area: asset_publish_area_substancepainter
-  template_work: substancepainter_asset_work
-  template_work_area: asset_work_area_substancepainter
-  location: "@apps.tk-multi-workfiles2.location"
-  entities:
-  - caption: Assets
-    entity_type: Task
-    filters:
-    - [entity, type_is, Asset]
-    hierarchy: [entity.Asset.sg_asset_type, entity, step, content]
-  file_extensions: []
+substancepainter.apps.tk-multi-pythonconsole:
+  location: "@common.apps.tk-multi-pythonconsole"
 
-substancepainter.apps.tk-multi-breakdown:
-  hook_scene_operations: "{engine}/tk-multi-breakdown/tk-substancepainter_scene_operations.py"
-  location: "@apps.tk-multi-breakdown.location"
+substancepainter.apps.tk-multi-shotgunpanel:
+  location: "@common.apps.tk-multi-shotgunpanel.location"

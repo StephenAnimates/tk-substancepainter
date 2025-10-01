@@ -8,21 +8,6 @@
 
 This is an mplementation of a Flow Production Tracking (ShotGrid/Shotgun) engine for [**Adobe Substance 3D Painter**](https://www.adobe.com/products/substance3d.html). It supports the bootstrap startup methods and integrates with Adobe Substance 3D Painter adding a **Flow Production Tracking** menu in the plugin toolbar. 
 
-* [Step 1: Download the Engine Code](#step-1-download-the-engine-code)
-* [Step 2: Set up the Project Environment](#step-2-set-up-the-project-environment)
-* [Step 3: Configuring Adobe Substance 3D Painter in the FlowPTR software launcher](#step-3-configure-the-software-in-flow-production-tracking)
-* [Step 4: Configure the Software in Flow Production Tracking (ShotGrid/Shotgun)](#step-4-configure-the-software-)
-* [Step 5: Configuring your project for Flow Production Tracking (ShotGrid/Shotgun) Toolkit](#configuring-your-project-for-shotgun-toolkit)
-* [Step 6: Caching and downloading the engine into disk](#caching-and-downloading-the-engine-into-disk)
-
-With the engine, hooks for most of the standard tk application are provided:
-
-* [tk-multi-workfiles2](#tk-multi-workfiles2)
-* [tk-multi-snapshot](#tk-multi-snapshot)
-* [tk-multi-loader2](#tk-multi-loader2)
-* [tk-multi-publish2](#tk-multi-publish2)
-* [tk-multi-breakdown](#tk-multi-breakdown)
-
 **Note for developers:** The communication between the Python-based engine and Adobe Substance 3D Painter is handled via QtWebsockets. The engine leverages the native Python environment and PySide2 library bundled with Substance 3D Painter, removing the need for external Qt frameworks.
 
 **This engine has been developed and tested on Windows and macOS and should be compatible with modern versions of Adobe Substance 3D Painter on all supported platforms (Windows, macOS, and Linux).**
@@ -141,12 +126,12 @@ tk-substancepainter releases
 engines.tk-substancepainter.location:
   type: git
   path: https://github.com/StephenAnimates/tk-substancepainter
-  version: v2.0.4
+  version: v2.0.5
 ```
 
 ### 2. Set up the Project Environment
 
-Next, you need to tell Toolkit which apps to run inside Substance 3D Painter.
+Next, you need to tell Toolkit which apps to run inside Substance 3D Painter. This follows the standard `tk-config-basic` pattern.
  
 1.  In your pipeline configuration, create a new folder for the integration: `config/env/includes/substancepainter`.
 2.  Copy the contents of this repository's `config/env/includes/substancepainter` folder (which includes `apps.yml`, `asset_step.yml`, `project.yml`, etc.) into your new folder.
@@ -154,7 +139,7 @@ Next, you need to tell Toolkit which apps to run inside Substance 3D Painter.
     *   **Source**: `tk-substancepainter/config/env/includes/substancepainter/*`
     *   **Destination**: `<your-pipeline-config>/config/env/includes/substancepainter/`
 
-3.  Now, open the environment files where you want to enable Substance 3D Painter (e.g., `config/env/asset_step.yml`, `config/env/project.yml`) and add the following lines:
+3.  Now, open your main `config/env/asset_step.yml` file and add the include for the Substance Painter settings:
 
 ```yaml
 # config/env/asset_step.yml
@@ -169,6 +154,7 @@ engines:
 
 # ... rest of the file
 ```
+
 ```yaml
 # config/env/project.yml
 
@@ -177,10 +163,41 @@ includes:
 - includes/substancepainter/project.yml
 
 engines:
-  # Add this block
+  # Add this block  
   tk-substancepainter: "@substancepainter.project"
 
 # ... rest of the file
+```
+If the following is not set up in the `apps.yml` file, add it:
+```yaml
+# config/env/apps.yml
+
+common.apps.tk-multi-workfiles2.location:
+  type: app_store
+  name: tk-multi-workfiles2
+  version: v0.12.1
+common.apps.tk-multi-breakdown2.location:
+  type: app_store
+  name: tk-multi-breakdown2
+  version: v0.4.4
+common.apps.tk-multi-screeningroom.location:
+  type: app_store
+  name: tk-multi-screeningroom
+  version: v0.4.2
+
+# ... rest of the file
+```
+
+Right-click in the Desktop app and choose **Refresh Projects**.
+
+Install the apps from the app store:
+```
+tank install_app apps tk-multi-workfiles2 tk-substancepainter
+
+tank install_app environment_name tk-multi-breakdown2 app_name
+
+tank install_app environment_name tk-multi-screeningroom app_name
+
 ```
 
 
@@ -189,10 +206,11 @@ engines:
 One last step is to cache the engine and apps from the configuration files into disk. FlowPTR provides a tank command for this. 
 [Tank Advanced Commands](https://support.shotgunsoftware.com/hc/en-us/articles/219033178-Administering-Toolkit#Advanced%20tank%20commands)
 
-* Open a console and navigate to your pipeline configuration folder, where you will find a `tank` or `tank.bat` file.
-(in our case we placed the pipeline configuration under `D:\demo\configs\game_config`)
+1. Open a Windows Command Prompt or a macOS Terminal window
+2. Run the `tank cache_apps` , and press the **Enter/Return** key. (if the Tank command is not an environment var you will need to add the path to the specific project configuration where the tank command is located)
+Example: `~/Library/Caches/Shotgun/djcad/p{project id}.basic.desktop/cfg/tank cache_apps`
 
-* type `tank cache_apps` , and press the Enter key. FlowPTR Toolkit will start revising the changes we have done to the configuration yml files and downloading what is requires.
+FlowPTR Toolkit will start revising the changes we have done to the configuration yml files and downloading what is requires.
 
 ![tank_cache_apps](config/images/tank_cache_apps.png)
 
@@ -207,11 +225,6 @@ This application forms the basis for file management in the Shotgun Pipeline Too
 Basic hooks have been implemented for this tk-app to work. open, save, save_as, reset, and current_path are the scene operations implemented.
 
 Note that "New file" does not actually create a new Adobe Substance 3D Painter project, just changes the context. Unfortunately the dialog to create a new project is not accesible through code, so could not be automated without loosing functionality. The user is responsible for creating a new project as normal in Adobe Substance 3D Painter after "New File" is clicked.  
-
-## [tk-multi-snapshot](https://support.shotgunsoftware.com/hc/en-us/articles/219033068)
-A Shotgun Snapshot is a quick incremental backup that lets you version and manage increments of your work without sharing it with anyone else. Take a Snapshot, add a description and a thumbnail, and you create a point in time to which you can always go back to at a later point and restore. This is useful if you are making big changes and want to make sure you have a backup of previous versions of your scene.
-
-Hooks are provided to be able to use this tk-app, similar to workfiles2.
 
 ## [tk-multi-loader2](https://support.shotgunsoftware.com/hc/en-us/articles/219033078)
 ![tk-substancepainter_01](config/images/tk-substancepainter_01.PNG)
@@ -256,7 +269,7 @@ settings.tk-multi-publish2.substancepainter.asset_step:
       **Publish Textures as Folder: true**
 ```
 
-## [tk-multi-breakdown](https://support.shotgunsoftware.com/hc/en-us/articles/219032988)
+## [tk-multi-breakdown2](https://support.shotgunsoftware.com/hc/en-us/articles/219032988)
 ![tk-substancepainter_02](config/images/tk-substancepainter_02.PNG)
 
 The Scene Breakdown App shows you a list of items you have loaded (referenced) in your scene and tells you which ones are out of date. From this overview, you can select multiple objects and click the update button which will update all your selected items to use the latest published version.
@@ -264,21 +277,6 @@ The Scene Breakdown App shows you a list of items you have loaded (referenced) i
 Note that this tool will only update the resources that have been loaded previously trough the Loader toolkit app.
 
 It also displays what textures loaded from the Loader app are in used within the scene and which ones are not. The tidying up of the shelf resources is left for the user.
-
-Finally, for completion, I've kept the original README from shotgun, that include very valuable links:
-
-## Documentation
-This repository is a part of the Shotgun Pipeline Toolkit.
-
-- For more information about this app and for release notes, *see the wiki section*.
-- For general information and documentation, click here: https://support.shotgunsoftware.com/entries/95441257
-- For information about Shotgun in general, click here: http://www.shotgunsoftware.com/toolkit
-
-## Using this app in your Setup
-All the apps that are part of our standard app suite are pushed to our App Store. 
-This is where you typically go if you want to install an app into a project you are
-working on. For an overview of all the Apps and Engines in the Toolkit App Store,
-click here: https://support.shotgunsoftware.com/entries/95441247.
 
 Credits:
 Originally Developed by: [Diego Garcia Huerta](https://www.linkedin.com/in/diegogh/)

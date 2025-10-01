@@ -9,9 +9,18 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 #
 
-# location for tk-substancepainter engine
+# this file contains apps that are common to multiple applications
+# and setups
 
-engines.tk-substancepainter.location:
-  type: git
-  path: https://github.com/StephenAnimates/tk-substancepainter
-  version: v2.0.5
+common.apps.tk-multi-workfiles2.location:
+  type: app_store
+  name: tk-multi-workfiles2
+  version: v0.12.1
+common.apps.tk-multi-breakdown2.location:
+  type: app_store
+  name: tk-multi-breakdown2
+  version: v0.4.4
+common.apps.tk-multi-screeningroom.location:
+  type: app_store
+  name: tk-multi-screeningroom
+  version: v0.4.2

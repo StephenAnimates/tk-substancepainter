@@ -13,7 +13,7 @@
 # the engine and app settings for all integrations running in this context.
 
 includes:
-- ./includes/substancepainter/asset_step.yml
+- includes/substancepainter/asset_step.yml
 
 engines:
   tk-substancepainter: "@substancepainter.asset_step"

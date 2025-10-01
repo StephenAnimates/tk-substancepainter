@@ -31,7 +31,7 @@ class SceneOperation(HookClass):
     opening a snapshot, and saving a snapshot.
     """
 
-    def execute(self, operation, file_path, context, **kwargs):
+    def execute(self, operation, file_path, context, *args, **kwargs):
         """
         Main hook entry point
 
@@ -53,24 +53,26 @@ class SceneOperation(HookClass):
 
         # ---- Get the current scene path
         if operation == "current_path":
-            # This is called by the Snapshot app to find out the path of the
-            # current open project, which is the source for the snapshot.
+            # This is called by the app to find out the path of the current
+            # open project, which is the source for the snapshot. The app
+            # uses this path to create the snapshot filename.
             return engine.app.get_current_project_path()
 
         # ---- Open a file
         elif operation == "open":
             # This is called when a user double-clicks a snapshot in the UI
-            # to restore it.
+            # to restore it. The app provides the file_path to open.
             engine.app.open_project(file_path)
 
         # ---- Save the current file
         elif operation == "save":
-            # This is called when a user is working on a snapshot and saves it.
+            # This is called when a user is working on a snapshot and saves it
+            # via the app's "Save" command.
             engine.app.save_project()
 
         # ---- Save the current file as a new file
         elif operation == "save_as":
             # This is the most important operation for this hook. It's called
             # when the user clicks the "Create Snapshot" button. The app provides
-            # the path where the new snapshot file should be saved.
+            # the file_path where the new snapshot file should be saved.
             engine.app.save_project_as(file_path)

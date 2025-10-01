@@ -473,7 +473,7 @@ PainterPlugin
       var result = alg.resources.importProjectResource(data.path, [data.usage], data.destination);
       
       // we store the info as a project settings as it will be reused later 
-      // when tk-multi-breakdown tries to figure out what resources are
+      // when tk-multi-breakdown2 tries to figure out what resources are
       // up to date and which are not.
 
       var settings = alg.project.settings.value("tk-multi-loader2", {});    

@@ -13,6 +13,7 @@
 
 # Updated:
 # September 2025, to use Python 3, and support current Adobe Substance 3D Painter version.
+#               adding support for tk-multi-breakdown2
 
 # https://help.autodesk.com/view/SGDEV/ENU/
 
@@ -32,7 +33,7 @@ class SubstancePainterResource(str):
     """
     Helper Class to store metadata per update item.
     
-    The tk-multi-breakdown app requires that the 'node' key in each item dictionary
+    The tk-multi-breakdown2 app requires that the 'node' key in each item dictionary
     be a string, as this is what it displays in the UI list.
     
     However, we need to associate more complex data with each item (like the
@@ -202,16 +203,27 @@ class BreakdownSceneOperations(HookBaseClass):
                 # A resource can have multiple usages (e.g., basecolor, normal).
                 # We need to re-import the new file for each of its original usages.
                 for usage in res_info["usages"]:
+                    self.parent.log_info(
+                        "Attempting to update resource for usage: '%s'" % (usage,)
+                    )
+
                     # 1. Import the new file from `new_path` as a new resource.
                     new_url = engine.app.import_project_resource(
                         new_path, usage, "Shotgun"
                     )
 
-                    engine.log_debug("Updating usage: %s" % usage)
+                    if not new_url:
+                        self.parent.log_error(
+                            "Failed to import new resource from path: %s" % (new_path,)
+                        )
+                        continue
+
                     engine.log_debug("Existing resource url: %s" % url)
                     engine.log_debug("New resource url: %s" % new_url)
 
                     # 2. Tell Substance 3D Painter to replace all instances of the old resource with the new one.
                     engine.app.update_document_resources(url, new_url)
 
-                    engine.log_debug("Updated usage: %s" % usage)
+                    self.parent.log_info(
+                        "Successfully updated resource for usage: '%s'" % (usage,)
+                    )
