@@ -23,6 +23,7 @@ from contextlib import closing
 import subprocess
 import shutil
 import sgtk
+
 from sgtk.platform import SoftwareLauncher, SoftwareVersion, LaunchInformation
 
 class SubstancePainterLauncher(SoftwareLauncher):
