@@ -19,36 +19,15 @@ common.engines.tk-multi-shotgunpanel.location:
 common.engines.tk-multi-publish2.location:
   type: app_store
   name: tk-multi-publish2
-  version: 
 common.engines.tk-multi-loader2.location:
   type: app_store
   name: tk-multi-loader2
-  version: 
-common.engines.tk-multi-shotgunpanel.location:
-  type: app_store
-  name: tk-multi-shotgunpanel
-  version: 
 common.engines.tk-multi-about.location:
   type: app_store
   name: tk-multi-about
-  version: 
-common.engines.tk-multi-publish2.location:
-  type: app_store
-  name: tk-multi-publish2
-  version: 
-common.engines.tk-multi-loader2.location:
-  type: app_store
-  name: tk-multi-loader2
-  version: 
-common.engines.tk-multi-shotgunpanel.location:
-  type: app_store
-  name: tk-multi-shotgunpanel
-  version: 
 common.engines.tk-multi-breakdown2.location:
   type: app_store
   name: tk-multi-breakdown2
-  version: 
 common.engines.tk-multi-workfiles2.location:
   type: app_store
   name: tk-multi-workfiles2
-  version: 
