@@ -37,8 +37,6 @@ class SubstancePainterLauncher(SoftwareLauncher):
     https://help.autodesk.com/view/SGDEV/ENU/?guid=SG_Pipeline_Toolkit_Core_API_tk_core_platform_launch
     """
 
-    print("starting the Substance Painter SoftwareLauncher")
-
     # Named regex strings to insert into the executable template paths when
     # matching against supplied versions and products. Similar to the glob
     # strings, these allow us to alter the regex matching for any of the
@@ -85,6 +83,8 @@ class SubstancePainterLauncher(SoftwareLauncher):
         :param str file_to_open: (optional) Full path name of a file to open on launch.
         :returns: :class:`LaunchInformation` instance
         """
+
+        self.logger.info("Starting the Substance Painter SoftwareLauncher...")
 
         # Before launching, ensure the Python plugin is installed.
         self._install_plugin()
