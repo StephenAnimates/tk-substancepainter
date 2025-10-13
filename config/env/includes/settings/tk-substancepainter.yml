@@ -13,40 +13,83 @@
 # Copy and paste the following block into your 'config/env/asset_step.yml'
 # ----------------------------------------------------------------------------
 
-tk-substancepainter.asset_step:
+# This file contains the engine configuration blocks for tk-substancepainter.
+#
+# To integrate Substance 3D Painter into your tk-config-default2 project,
+# copy the relevant blocks below and paste them at the end of your
+# environment files (e.g., config/env/asset_step.yml, config/env/project.yml).
+#
+# This ensures that the Substance 3D Painter engine and its apps are loaded
+# in the correct contexts.
+
+################################################################################
+
+includes:
+- ../app_locations.yml
+- ../engine_locations.yml
+- ./tk-multi-loader2.yml
+- ./tk-multi-publish2.yml
+- ./tk-multi-shotgunpanel.yml
+- ./tk-multi-breakdown2.yml
+- ./tk-multi-workfiles2.yml
+
+################################################################################
+
+# asset
+settings.tk-substancepainter.asset:
   apps:
-    tk-multi-about: "@apps.tk-multi-about.location"
-    tk-multi-workfiles2: "@tk-multi-workfiles2.substancepainter.asset"
-    tk-multi-publish2: "@tk-multi-publish2.substancepainter.asset"
-    tk-multi-loader2: "@tk-multi-loader2.substancepainter"
-    tk-multi-breakdown2: "@tk-multi-breakdown2.substancepainter"
-    tk-multi-shotgunpanel: "@tk-multi-shotgunpanel"
-    tk-multi-pythonconsole: "@tk-multi-pythonconsole"
+    tk-multi-about:
+      location: "@apps.tk-multi-about.location"
+    tk-multi-pythonconsole:
+      location: "@apps.tk-multi-pythonconsole.location"
+    tk-multi-shotgunpanel: "@settings.tk-multi-shotgunpanel"
+    tk-multi-workfiles2: "@settings.tk-multi-workfiles2"
+  menu_favourites:
+  - {app_instance: tk-multi-workfiles2, name: File Open...}
+  location: "@engines.tk-substancepainter.location"
+
+# asset_step
+settings.tk-substancepainter.asset_step:
+  apps:
+    tk-multi-about:
+      location: "@apps.tk-multi-about.location"
+    tk-multi-pythonconsole:
+      location: "@apps.tk-multi-pythonconsole.location"
+    tk-multi-loader2: "@apps.tk-multi-loader2.location"
+    tk-multi-publish2: "@apps.tk-multi-publish2.location"
+    tk-multi-shotgunpanel: "@settings.tk-multi-shotgunpanel"
+    tk-multi-breakdown2: "@apps.tk-multi-breakdown2.location"
+    tk-multi-workfiles2: "@settings.tk-multi-workfiles2"
   menu_favourites:
   - {app_instance: tk-multi-workfiles2, name: File Open...}
   - {app_instance: tk-multi-workfiles2, name: File Save...}
-  location: "@tk-substancepainter"
+  - {app_instance: tk-multi-publish2, name: Publish...}
+  location: "@engines.tk-substancepainter.location"
 
-# ----------------------------------------------------------------------------
-# Project Environment Configuration
-#
-# Copy and paste the following block into your 'config/env/project.yml'
-# ----------------------------------------------------------------------------
-
-tk-substancepainter.project:
+# project
+settings.tk-substancepainter.project:
   apps:
-    tk-multi-about: "@apps.tk-multi-about.location"
-    tk-multi-workfiles2: "@tk-multi-workfiles2.substancepainter.project"
-    tk-multi-shotgunpanel: "@tk-multi-shotgunpanel"
-    tk-multi-pythonconsole: "@tk-multi-pythonconsole"
+    tk-multi-about:
+      location: "@apps.tk-multi-about.location"
+    tk-multi-pythonconsole:
+      location: "@apps.tk-multi-pythonconsole.location"
+    tk-multi-shotgunpanel: "@settings.tk-multi-shotgunpanel"
+    tk-multi-workfiles2: "@settings.tk-multi-workfiles2"
   menu_favourites:
   - {app_instance: tk-multi-workfiles2, name: File Open...}
-  location: "@tk-substancepainter"
+  - {app_instance: tk-multi-workfiles2, name: File Save...}
+  location: "@engines.tk-substancepainter.location"
   run_at_startup:
   - {app_instance: tk-multi-shotgunpanel, name: 'Flow Production Tracking'}
 
 # Note: The '@' syntax requires that the corresponding app settings
-# (e.g., '@tk-multi-workfiles2.substancepainter.asset') are defined in an
-# included settings file, such as 'config/env/includes/substancepainter/settings.yml',
-# and the engine location ('@tk-substancepainter') is defined in
-# 'config/env/includes/engine_locations.yml'.
+# '@apps.tk-multi-workfiles2' are defined in the app_locations.yml
+# included settings file, such as 'config/env/includes/app_locations.yml',
+# '@engines.tk-substancepainter.location' is the engine location defined in:
+# 'config/env/includes/engine_locations.yml'
+
+################################################################################
+
+settings.substancepainter.tk-multi-breakdown2:
+  hook_scene_operations: "{engine}/tk-multi-breakdown2/tk-substancepainter_scene_operations.py"
+  location: "@apps.tk-multi-breakdown2.location"

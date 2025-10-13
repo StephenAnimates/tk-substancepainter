@@ -191,20 +191,20 @@ Finally, edit your environment files to use the new configurations.
     ```yaml
     # config/env/asset_step.yml
     includes:
-    - ./includes/substancepainter/asset_step.yml
+    - includes/settings/tk-substancepainter.yml
 
     engines:
-      tk-substancepainter: "@substancepainter.asset_step"
+      tk-substancepainter: "@settings.substancepainter.asset_step"
     ```
 
-2.  **Update the `project` environment:**
-    Do the same for your `config/env/project.yml` file to activate the engine when you are in the main Project context.
+2.  **Update the project configuration:**
+    Add the following to `config/env/project.yml`.
 
     ```yaml
     # config/env/project.yml
     includes:
-    - ./includes/substancepainter/project.yml
+    - includes/settings/tk-substancepainter.yml
 
     engines:
-      tk-substancepainter: "@substancepainter.project"
+      tk-substancepainter: "@settings.tk-substancepainter.project"
     ```
