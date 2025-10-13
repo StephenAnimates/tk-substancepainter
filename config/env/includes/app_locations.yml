@@ -1,0 +1,61 @@
+# This file is where you define the locations of all the apps used by your project.
+#
+# The 'tank cache_apps' command will parse this file and download all the
+# necessary code into your local bundle cache.
+#
+# For more information, see the Toolkit documentation:
+# https://help.autodesk.com/view/SGDEV/ENU/?guid=SG_Pipeline_Toolkit_Admin_Guide_app_and_engine_locations_html
+
+# ----------------------------------------------------------------------------
+# Standard Apps
+
+# The "About" app.
+tk-multi-about:
+  type: app_store
+  name: tk-multi-about
+  version: v0.3.0
+
+# The Python console.
+tk-multi-pythonconsole:
+  type: app_store
+  name: tk-multi-pythonconsole
+  version: v1.3.0
+
+# The Flow Production Tracking Panel.
+tk-multi-shotgunpanel:
+  type: app_store
+  name: tk-multi-shotgunpanel
+  version: v1.9.2
+
+# ----------------------------------------------------------------------------
+# Apps required by the Substance 3D Painter Engine
+
+# Required for File Open/Save workflows.
+tk-multi-workfiles2:
+  type: app_store
+  name: tk-multi-workfiles2
+  version: v0.12.1
+
+# Required for publishing files to Flow Production Tracking.
+tk-multi-publish2:
+  type: app_store
+  name: tk-multi-publish2
+  version: v2.6.5
+
+# Required for loading published files into the scene.
+tk-multi-loader2:
+  type: app_store
+  name: tk-multi-loader2
+  version: v2.5.1
+
+# Required for the Breakdown/Update functionality.
+tk-multi-breakdown2:
+  type: app_store
+  name: tk-multi-breakdown2
+  version: v0.4.4
+
+# Required for the "Upload for review" publish plugin.
+tk-multi-screeningroom:
+  type: app_store
+  name: tk-multi-screeningroom
+  version: v0.4.2

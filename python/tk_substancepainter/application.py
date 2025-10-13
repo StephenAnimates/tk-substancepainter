@@ -9,37 +9,39 @@ September 2025, to use Python 3, and support current Adobe Substance 3D Painter 
 
 """
 
-import os
+
 import sys
 import json
 import time
 import threading
 import uuid
 from functools import partial
-
+import sgtk
 import signal
 
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-from tank.platform.qt5 import QtGui, QtCore, QtWebSockets, QtNetwork
+from sgtk.platform import qt as sgtk_qt
 
-QCoreApplication = QtCore.QCoreApplication
-QUrl = QtCore.QUrl
-QAbstractSocket = QtNetwork.QAbstractSocket
+# import the module - note that this is using the special
 
 __author__ = "Diego Garcia Huerta"
 __email__ = "diegogh2000@gmail.com"
 
-class Client(QtCore.QObject):
+class Client(sgtk_qt.QtCore.QObject):
     """
     A low-level WebSocket client for communicating with the Adobe Substance 3D Painter
     QML plugin.
 
     This class handles the connection, message serialization (JSON-RPC 2.0),
-    and asynchronous message handling.
+    and asynchronous message handling. It uses Qt's WebSocket implementation.
+
+    - Qt WebSockets Documentation: https://doc.qt.io/qt-6/qtwebsockets-index.html
+    - JSON-RPC 2.0 Specification: https://www.jsonrpc.org/specification
+
     """
 
-    requestReceived = QtCore.Signal(str, object)
+    requestReceived = sgtk_qt.QtCore.Signal(str, object)
 
     def __init__(self, engine, parent=None, url="ws://localhost:12345"):
         """
@@ -53,8 +55,8 @@ class Client(QtCore.QObject):
         self._sync_response = None
         self.engine = engine
         self.url = url
-        self.client = QtWebSockets.QWebSocket(
-            "", QtWebSockets.QWebSocketProtocol.Version13, None
+        self.client = sgtk_qt.QtWebSockets.QWebSocket(
+            "", sgtk_qt.QtWebSockets.QWebSocketProtocol.Version13, None
         )
 
         # Connect Qt signals from the WebSocket to handler methods (slots).
@@ -84,8 +86,8 @@ class Client(QtCore.QObject):
 
     def connect_to_server(self):
         """Initiates the connection to the WebSocket server."""
-        self.log_debug("Client start connection | %s " % QtCore.QUrl(self.url))
-        result = self.client.open(QtCore.QUrl(self.url))
+        self.log_debug("Client start connection | %s " % sgtk_qt.QtCore.QUrl(self.url))
+        result = self.client.open(sgtk_qt.QtCore.QUrl(self.url))
         self.log_debug("Client start connection | result | %s " % result)
 
     def ping(self):
@@ -100,8 +102,8 @@ class Client(QtCore.QObject):
 
     def on_disconnected(self):
         """Slot executed when the WebSocket disconnects."""
-        self.log_debug("client: on_disconnected")
         self.engine.process_request("QUIT")
+        self.log_debug("client: disconnected")
 
     def on_error(self, error_code):
         """Slot executed when a WebSocket error occurs."""
@@ -113,13 +115,13 @@ class Client(QtCore.QObject):
         """Slot executed when the WebSocket's connection state changes."""
         self.log_debug("client: on_state_changed: %s" % state)
         state = self.client.state()
-        if state == QAbstractSocket.SocketState.ConnectingState:
+        if state == sgtk_qt.QtNetwork.QAbstractSocket.SocketState.ConnectingState:
             return
 
         attempts = 0
         while attempts < self.max_attemps and self.client.state() not in (
             # If disconnected, attempt to reconnect a few times.
-            QAbstractSocket.SocketState.ConnectedState,
+            sgtk_qt.QtNetwork.QAbstractSocket.SocketState.ConnectedState,
         ):
             attempts += 1
             self.log_debug("client: attempted to reconnect : %s" % attempts)
@@ -139,7 +141,7 @@ class Client(QtCore.QObject):
         :return: The data from the response, or None on timeout.
         """
         self._sync_response = None
-        loop = QtCore.QEventLoop()
+        loop = sgtk_qt.QtCore.QEventLoop()
 
         def await_for_response(result):
             """Callback executed when a response is received."""
@@ -150,7 +152,7 @@ class Client(QtCore.QObject):
         self.send_text_message(command, callback=await_for_response, **kwargs)
 
         # Set up a timer to exit the loop in case of no response
-        timeout_timer = QtCore.QTimer(parent=QtCore.QCoreApplication.instance())
+        timeout_timer = sgtk_qt.QtCore.QTimer(parent=sgtk_qt.QtCore.QCoreApplication.instance())
         timeout_timer.setSingleShot(True)
         timeout_timer.timeout.connect(loop.quit)
         timeout_timer.start(5000)  # 5-second timeout
@@ -184,16 +186,16 @@ class Client(QtCore.QObject):
     def send_text_message(self, command, message_id=None, callback=None, **kwargs):
         """Constructs and sends a JSON-RPC 2.0 request to the server."""
         if self.client.state() in (
-            QAbstractSocket.SocketState.ClosingState,
-            QAbstractSocket.SocketState.UnconnectedState,
+            sgtk_qt.QtNetwork.QAbstractSocket.SocketState.ClosingState,
+            sgtk_qt.QtNetwork.QAbstractSocket.SocketState.UnconnectedState,
         ):
             # Don't try to send if we're not connected.
             self.log_warning("Client is not connected. Ignoring message: %s", command)
             return
 
         # wait until connected
-        while self.client.state() == QAbstractSocket.SocketState.ConnectingState:
-            QCoreApplication.processEvents()
+        while self.client.state() == sgtk_qt.QtNetwork.QAbstractSocket.SocketState.ConnectingState:
+            sgtk_qt.QtCore.QCoreApplication.processEvents()
             time.sleep(self.wait_period)
             self.log_debug("Waiting for WebSocket to connect...")
             pass
@@ -219,7 +221,7 @@ class Client(QtCore.QObject):
         pass
 
     def close(self):
-        self.log_debug("client: closed.")
+        self.log_debug("client: closed: '%s'", self.client.state())
         self.client.close()
 
 
@@ -347,7 +349,7 @@ class EngineClient(Client):
         # Block execution by processing Qt events until the export is finished.
         while self.__export_results is None:
             self.log_debug("Waiting for maps to be exported ...")
-            QCoreApplication.processEvents()
+            sgtk_qt.QtCore.QCoreApplication.processEvents()
             time.sleep(self.wait_period)
 
         # Clean up the temporary callback.
@@ -402,7 +404,7 @@ class EngineClient(Client):
 
 if __name__ == "__main__":
     global client
-    app = QtCore.QCoreApplication(sys.argv)
+    app = sgtk_qt.QtCore.QCore_Application(sys.argv)
     # This test block requires a running engine and Substance Painter instance.
     # client = Client(app)
     #

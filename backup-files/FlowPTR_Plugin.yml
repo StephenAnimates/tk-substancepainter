@@ -1,0 +1,14 @@
+# Was suggested to add this to the engine specific apps.yml file
+# config/env/includes/substancepainter/apps.yml
+# keeping for reference, but took this out of the project
+
+
+substancepainter.apps.FlowPTR_Plugin:
+  location:
+    type: path
+    name: tk-multi-my-flowptr-plugin # Use the registered app name
+    path: './apps/tk-multi-my-flowptr-plugin'
+  class_name: FlowPTR_PluginApp
+  # This must match the name of the class you defined in your __init__.py.
+  menu_name: Flow Production Tracking
+  # Define the menu name to be created in Substance Painter here

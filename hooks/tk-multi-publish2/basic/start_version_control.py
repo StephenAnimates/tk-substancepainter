@@ -20,7 +20,6 @@ import sgtk
 
 __author__ = "Diego Garcia Huerta"
 __contact__ = "https://www.linkedin.com/in/diegogh/"
-utils = sgtk.platform.current_engine().import_module("tk_substancepainter.utils")
 
 HookBaseClass = sgtk.get_hook_baseclass()
 
@@ -131,6 +130,9 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
         :returns: dictionary with boolean keys accepted, required and enabled
         """
 
+        # Moved from module level to ensure engine exists when called.
+        utils = sgtk.platform.current_engine().import_module("tk_substancepainter.utils")
+
         path = utils.get_session_path()
 
         # First, check if the session has been saved at all.
@@ -183,6 +185,9 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
         :returns: True if item is valid, False otherwise.
         """
 
+        # Moved from module level to ensure engine exists when called.
+        utils = sgtk.platform.current_engine().import_module("tk_substancepainter.utils")
+
         publisher = self.parent
         path = utils.get_session_path()
 
@@ -227,6 +232,9 @@ class SubstancePainterStartVersionControlPlugin(HookBaseClass):
                          The values are `Setting` instances.
         :param item: Item to process
         """
+
+        # Moved from module level to ensure engine exists when called.
+        utils = sgtk.platform.current_engine().import_module("tk_substancepainter.utils")
 
         publisher = self.parent
 

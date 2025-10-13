@@ -22,9 +22,6 @@ import sgtk
 __author__ = "Diego Garcia Huerta"
 __contact__ = "https://www.linkedin.com/in/diegogh/"
 
-# Import the shared hook utility functions.
-utils = sgtk.platform.current_engine().import_module("tk_substancepainter.utils")
-
 HookBaseClass = sgtk.get_hook_baseclass()
 
 
@@ -175,6 +172,9 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
         :returns: dictionary with boolean keys accepted, required and enabled
         """
 
+        # Moved from module level to ensure engine exists when called.
+        utils = sgtk.platform.current_engine().import_module("tk_substancepainter.utils")
+
         # if a publish template is configured, disable context change. This
         # is a temporary measure until the publisher handles context switching
         # natively.
@@ -208,6 +208,9 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
         :param item: Item to process
         :returns: True if item is valid, False otherwise.
         """
+
+        # Moved from module level to ensure engine exists when called.
+        utils = sgtk.platform.current_engine().import_module("tk_substancepainter.utils")
 
         publisher = self.parent
         path = utils.get_session_path()
@@ -311,6 +314,9 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
         :param item: Item to process
         """
 
+        # Moved from module level to ensure engine exists when called.
+        utils = sgtk.platform.current_engine().import_module("tk_substancepainter.utils")
+
         # get the path in a normalized state. no trailing separator, separators
         # are appropriate for current os, no double separators, etc.
         path = sgtk.util.ShotgunPath.normalize(utils.get_session_path())
@@ -342,6 +348,9 @@ class SubstancePainterSessionPublishPlugin(HookBaseClass):
                          The values are `Setting` instances.
         :param item: Item to process
         """
+
+        # Moved from module level to ensure engine exists when called.
+        utils = sgtk.platform.current_engine().import_module("tk_substancepainter.utils")
 
         # do the base class finalization
         super(SubstancePainterSessionPublishPlugin, self).finalize(settings, item)

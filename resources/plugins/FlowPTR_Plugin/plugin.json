@@ -1,0 +1,7 @@
+{
+  "name": "Flow Production Tracking Integration",
+  "description": "A pure Python integration for Flow Production Tracking (ShotGrid) Toolkit.",
+  "version": "1.0.0",
+  "author": "Stephen Studyvin",
+  "main_module": "FlowPTR_Plugin.__init__"
+}

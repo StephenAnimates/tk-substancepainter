@@ -12,7 +12,8 @@ import os
 import sgtk
 from packaging.version import parse as LooseVersion
 from sgtk.util.filesystem import ensure_folder_exists
-
+shotgun_globals = sgtk.platform.import_framework("tk-framework-shotgunutils", "shotgun_globals")
+task_manager = sgtk.platform.import_framework("tk-framework-shotgunutils", "task_manager")
 
 def to_normalized_version(version):
     """
@@ -27,6 +28,7 @@ def to_normalized_version(version):
     :param version: Version string to normalize.
     :returns: A `packaging.version.Version` object.
     """
+
     version_obj = LooseVersion(str(version))
     if version_obj.major >= 2017:
         return LooseVersion("%s.%s.%s" % (version_obj.major - 2014, version_obj.minor, version_obj.micro))

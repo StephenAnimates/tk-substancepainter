@@ -15,6 +15,12 @@
 includes:
 - ../common/apps.yml
 
+# Override the launch app settings for this engine to use our custom hook.
+substancepainter.apps.tk-multi-launchapp:
+  location: "@common.apps.tk-multi-launchapp.location"
+  engine: tk-substancepainter
+  hook_app_launch: "{engine}/app_launch.py"
+
 substancepainter.apps.tk-multi-workfiles2:
   allow_task_creation: false
   # create_new_task_hook: "{self}/create_new_task.py"
@@ -38,7 +44,7 @@ substancepainter.apps.tk-multi-workfiles2:
 
 substancepainter.apps.tk-multi-workfiles2.project:
   allow_task_creation: true
-  create_new_task_hook: "{self}/create_new_task.py"
+  # create_new_task_hook: "{self}/create_new_task.py"
   custom_actions_hook: "{self}/custom_actions.py"
   entities:
   - caption: Assets
@@ -120,9 +126,3 @@ substancepainter.apps.tk-multi-loader2:
 substancepainter.apps.tk-multi-breakdown2:
   hook_scene_operations: "{engine}/tk-multi-breakdown2/tk-substancepainter_scene_operations.py"
   location: "@common.apps.tk-multi-breakdown2.location"
-
-substancepainter.apps.tk-multi-pythonconsole:
-  location: "@common.apps.tk-multi-pythonconsole"
-
-substancepainter.apps.tk-multi-shotgunpanel:
-  location: "@common.apps.tk-multi-shotgunpanel.location"

@@ -2,7 +2,7 @@
 #
 # CONFIDENTIAL AND PROPRIETARY
 #
-# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit
+# This work is provided 'AS IS' and subject to the Shotgun Pipeline Toolkit
 # Source Code License included in this distribution package. See LICENSE.
 # By accessing, using, copying or modifying this work you indicate your
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
@@ -18,18 +18,19 @@ includes:
 
 substancepainter.asset_step:
   apps:
-    tk-multi-about: "@common.apps.tk-multi-about"
-    tk-multi-publish2: "@substancepainter.apps.tk-multi-publish2" # Custom settings in apps.yml
-    tk-multi-loader2: "@substancepainter.apps.tk-multi-loader2"  # Custom settings in apps.yml
-    tk-multi-shotgunpanel: '@substancepainter.apps.tk-multi-shotgunpanel'
-    tk-multi-breakdown2: "@substancepainter.apps.tk-multi-breakdown2" # Custom settings in apps.yml
-    tk-multi-workfiles2: "@substancepainter.apps.tk-multi-workfiles2" # Custom settings in apps.yml
+    tk-multi-about: '@common.apps.tk-multi-about'
+    tk-multi-pythonconsole: '@common.apps.tk-multi-pythonconsole'
+    tk-multi-shotgunpanel: '@common.apps.tk-multi-shotgunpanel.location'
+    tk-multi-publish2: '@substancepainter.apps.tk-multi-publish2' # Custom settings in apps.yml
+    tk-multi-loader2: '@substancepainter.apps.tk-multi-loader2'  # Custom settings in apps.yml
+    tk-multi-breakdown2: '@substancepainter.apps.tk-multi-breakdown2' # Custom settings in apps.yml
+    tk-multi-workfiles2: '@substancepainter.apps.tk-multi-workfiles2' # Custom settings in apps.yml
   menu_favourites:
   - {app_instance: tk-multi-workfiles2, name: File Open...}
   - {app_instance: tk-multi-workfiles2, name: File Save...}
   - {app_instance: tk-multi-publish2, name: Publish...}
   - {app_instance: tk-multi-shotgunpanel, name: Flow Production Tracking Panel}
   - {app_instance: tk-multi-about, name: About...}
-  location: "@engines.tk-substancepainter.location"
+  location: '@engines.tk-substancepainter.location'
   run_at_startup:
   - {app_instance: tk-multi-shotgunpanel, name: ''}

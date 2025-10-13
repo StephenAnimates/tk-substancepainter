@@ -17,6 +17,7 @@
 # September 2025, to support current Adobe Substance 3D Painter version.
 
 # expected fields in the configuration file for this engine
+
 configuration:
 
     automatic_context_switch:
@@ -82,7 +83,7 @@ configuration:
         description: Optionally choose to use 'Sgtk' as the primary menu name instead of 'Shotgun'
         default_value: false
 
-    launch_builtin_plugins:
+        
         type: list
         description: Comma-separated list of tk-substancepainter plugins to load when launching 
                     Adobe Substance 3D Painter. Use of this feature disables the classic mechanism
@@ -101,4 +102,8 @@ description: "Flow Production Tracking (ShotGrid/Shotgun) Integration for Adobe 
 
 # Required minimum versions for this item to run
 requires_shotgun_version: 
-requires_core_version: "v0.20.0"
+requires_core_version: "v0.22.3"
+
+frameworks:
+    - {"name": "tk-framework-shotgunutils", "version": "v5.x.x"}
+    - {"name": "tk-framework-qtwidgets", "version": "v2.x.x"}

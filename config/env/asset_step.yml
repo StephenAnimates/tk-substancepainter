@@ -9,8 +9,10 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 #
 
-# This file is the main configuration for the asset_step environment. It includes
-# the engine and app settings for all integrations running in this context.
+# This file is the main configuration for the asset_step environment for the
+# tk-substancepainter engine with the tk-config-basic2 configuration.
+# This file includes the engine and app settings for all integrations running
+# in this context.
 
 includes:
 - includes/substancepainter/asset_step.yml

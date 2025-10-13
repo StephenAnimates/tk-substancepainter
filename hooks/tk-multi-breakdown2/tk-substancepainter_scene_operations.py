@@ -30,6 +30,10 @@ RESOURCE_IN_USE_COLOR = "#e7a81d"
 RESOURCE_NOT_IN_USE_COLOR = "gray"
 
 class SubstancePainterResource(str):
+    # Use __slots__ to reduce memory footprint, as many instances of this
+    # class may be created during a scene scan.
+    __slots__ = ("resource", "in_use", "nice_name")
+
     """
     Helper Class to store metadata per update item.
     
@@ -49,17 +53,19 @@ class SubstancePainterResource(str):
     presenting a user-friendly string in the UI.
     """
 
-    def __new__(cls, resource, in_use, nice_name):
-        text = (
-            "<span style='color:%s'><b>(%s) - %s</b></span>"
-            "<br/><nobr><sub>%s</sub></nobr>"
-            % (
-                RESOURCE_IN_USE_COLOR if in_use else RESOURCE_NOT_IN_USE_COLOR,
-                "Used" if in_use else "Not Used",
-                nice_name,
-                resource["url"],
-            )
-        )
+    def __new__(cls, resource: dict, in_use: bool, nice_name: str):
+        """
+        Creates a new instance, formatting the string value with HTML and
+        attaching metadata.
+        """
+        color = RESOURCE_IN_USE_COLOR if in_use else RESOURCE_NOT_IN_USE_COLOR
+        status = "Used" if in_use else "Not Used"
+        # Use .get() for safer access to the resource URL
+        url = resource.get("url", "Unknown URL")
+
+        # Use an f-string for improved readability
+        text = f"<span style='color:{color}'><b>({status}) - {nice_name}</b></span><br/><nobr><sub>{url}</sub></nobr>"
+
         obj = str.__new__(cls, text)
         obj.resource = resource
         obj.in_use = in_use

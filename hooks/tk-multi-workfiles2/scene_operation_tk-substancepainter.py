@@ -16,7 +16,7 @@
 
 import os
 import sgtk
-from sgtk.platform.qt5 import QtWidgets
+from sgtk.platform.qt import QtWidgets
 
 HookClass = sgtk.get_hook_baseclass()
 
@@ -29,6 +29,9 @@ class SceneOperation(HookClass):
 
     This hook implements the logic for the open, save, save as, and new file
     actions in the Workfiles2 app.
+
+    For more on the scene operation hook, see:
+    https://help.autodesk.com/view/SGDEV/ENU/?guid=tk-multi-workfiles2_hook_scene_operation
     """
 
     # A class-level variable to temporarily store the path to the mesh selected

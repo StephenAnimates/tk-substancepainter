@@ -6,14 +6,17 @@ templates:
 
     # The keys section contains the definitions for all the different keys that are being
     # used in the Toolkit. A key is a magic token that is replaced by a value at runtime, for example
-    # {Shot}. The section below tells the Toolkit which data types and formats to expect for each key.
+    # {Asset}. The section below tells the Toolkit which data types and formats to expect for each key.
+
     keys:
+        # represents texture files from Substance Painter
         texture_extension:
             type: str
             alias: extension
 
         texture_name:
             type: str
+
 
     # The paths section contains all the the key locations where files are to be stored
     # by the Toolkit Apps. Each path is made up of several keys (like {version} or {shot}) and
@@ -23,9 +26,6 @@ templates:
     # different files should go.
 
     paths:
-        #
-        # Adobe Substance 3D Painter
-        #
 
         # asset
         # define the location of a work area

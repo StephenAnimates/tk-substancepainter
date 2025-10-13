@@ -20,128 +20,36 @@
 A Substance Painter engine for Flow Production Tracking (ShotGrid)
 https://www.adobe.com/products/substance3d.html
 
+Integrations user guide
+https://help.autodesk.com/view/SGDEV/ENU/?guid=SG_Supervisor_Artist_sa_integrations_sa_integrations_user_guide_html
+
 """
 
+import shiboken6
 import os
 import sys
 import time
 import inspect
 import logging
-import traceback
 from functools import wraps
 
-import tank
+
+import tank, sgtk
 from tank.log import LogManager
 from tank.platform import Engine
-from tank.platform.constants import SHOTGUN_ENGINE_NAME
-from tank.platform.constants import TANK_ENGINE_INIT_HOOK_NAME
+from tank.platform.constants import SHOTGUN_ENGINE_NAME, TANK_ENGINE_INIT_HOOK_NAME
 
-__author__ = "Diego Garcia Huerta"
-__contact__ = "https://www.linkedin.com/in/diegogh/"
+# https://developers.shotgridsoftware.com/tk-framework-shotgunutils/
 
-# env variable that control if to show the compatibility warning dialog
-# when Substance Painter software version is above the tested one.
-SHOW_COMP_DLG = "SGTK_COMPATIBILITY_DIALOG_SHOWN"
+# Import PySide6 classes directly
+from PySide6 import QtGui, QtCore, QtWidgets
 
-MINIMUM_SUPPORTED_VERSION = "2018.3"
+from PySide6.QtWidgets import QDialog
+from PySide6.QtCore import Qt
 
-
-# logging functionality
-def display_error(msg):
-    t = time.asctime(time.localtime())
-    print("%s - FlowPTR Error | Substance 3D Painter engine | %s " % (t, msg))
-
-
-def display_warning(msg):
-    t = time.asctime(time.localtime())
-    print("%s - FlowPTR Warning | Substance 3D Painter engine | %s " % (t, msg))
-
-
-def display_info(msg):
-    t = time.asctime(time.localtime())
-    print("%s - FlowPTR Info | Substance 3D Painter engine | %s " % (t, msg))
-
-
-def display_debug(msg):
-    if os.environ.get("TK_DEBUG") == "1":
-        t = time.asctime(time.localtime())
-        print("%s - FlowPTR Debug | Substance 3D Painter engine | %s " % (t, msg))
-
-# methods to support the state when the engine cannot start up
-# for example if a non-tank file is loaded in Substance Painter we load the
-# project context if exists, so we give a chance to the user to at least
-# do the basics operations.
-
-def refresh_engine(scene_name, prev_context):
-    """
-    Refresh the current engine
-    """
-
-    engine = tank.platform.current_engine()
-
-    if not engine:
-        # If we don't have an engine for some reason then we don't have
-        # anything to do.
-        sys.stdout.write("refresh_engine | no engine!\n")
-        return
-
-    # This is a File->New call, so we just leave the engine in the current
-    # context and move on.
-    if scene_name in ("", "Untitled.spp"):
-        if prev_context and prev_context != engine.context:
-            engine.change_context(prev_context)
-
-        # FlowPTR menu may have been removed, so add it back in if its not
-        # already there.
-        engine.create_shotgun_menu()
-        return
-
-    # determine the tk instance and ctx to use:
-    tk = engine.sgtk
-
-    # loading a scene file
-    new_path = os.path.abspath(scene_name)
-
-    # this file could be in another project altogether, so create a new
-    # API instance.
-    try:
-        # and construct the new context for this path:
-        tk = tank.tank_from_path(new_path)
-        ctx = tk.context_from_path(new_path, prev_context)
-    except tank.TankError:
-        try:
-            # could not detect context from path, will use the project context
-            # for menus if it exists
-            ctx = engine.sgtk.context_from_entity_dictionary(engine.context.project)
-            message = (
-                "Flow Production Tracking could not detect a context from the project path.\n"
-                "from the project loaded. FlowPTR menus will be reset\n"
-                "to the project '%s' context.\n"
-                % engine.context.project.get("name")
-            )
-            engine.show_warning(message)
-
-        except tank.TankError:
-            (exc_type, exc_value, exc_traceback) = sys.exc_info()
-            message = ""
-            message += "Flow Production Tracking engine cannot be started.\n"
-            message += "Please contact support\n\n"
-            message += "Exception: %s - %s\n" % (exc_type, exc_value)
-            message += "Traceback (most recent call last):\n"
-            message += "\n".join(traceback.format_tb(exc_traceback))
-
-            # disabled menu, could not get project context
-            engine.create_shotgun_menu(disabled=True)
-            engine.show_error(message)
-            return
-
-    if ctx != engine.context:
-        engine.change_context(ctx)
-
-    # FlowPTR menu may have been removed,
-    # so add it back in if its not already there.
-    engine.create_shotgun_menu()
-
+# for the get_all_ui_panels method
+from PySide6.QtWidgets import QApplication, QWidget, QDockWidget
+from typing import List
 
 class SubstancePainterEngine(Engine):
     """
@@ -150,65 +58,135 @@ class SubstancePainterEngine(Engine):
     This engine is responsible for managing the communication with Substance 3D Painter,
     bootstrapping the Toolkit environment, handling context changes, and displaying
     Toolkit app UIs.
+
+    For more on Toolkit engines, see:
+    https://help.autodesk.com/view/SGDEV/ENU/?guid=SG_Pipeline_Toolkit_Core_API_tk_core_platform_engine_html
     """
 
     def __init__(self, *args, **kwargs):
         """
         Engine Constructor
         """
-        self._qt_app = None
-        self._dcc_app = None
-        self._menu_generator = None
-        self._event_callbacks = {}
 
+        # main application object
+        self._qt_app = None
+        self._menu_generator = None
+        self._dock_widgets = {}
+        self._event_callbacks = {}
+        self._is_shutting_down = False  # Initialized to False
+        self._shotgun_utils = None
+        self.overlay_widget = None # Defensive initialization for potential base class access
+
+        # The '_dcc_app' property will now be a simple wrapper around the
+        # substance_painter python module for direct API calls.
+        # We must import and assign it here in the constructor to ensure it's
+        # available for the very first log messages emitted by the base class.
+        import substance_painter
+        self._dcc_app = substance_painter
+
+        # It is critical to initialize the base Engine class FIRST.
+        # This sets up all the core Toolkit functionality, including 'import_framework'.
         Engine.__init__(self, *args, **kwargs)
+
+    def create_widget_from_class(self, widget_class, parent):
+        """
+        Creates a widget from the given class, parents it to the main application window, and handles its lifetime.
+
+        This is a helper method to ensure that all created widgets are tracked by the engine.
+
+        :param widget_class: The class of the widget to create.
+        :param parent: The parent QWidget for the new widget.
+        :returns: The created widget instance.
+        """
+        widget = widget_class(parent)
+
+        # Add to the list of created dialogs for tracking
+        self.created_qt_dialogs.append(widget)
+
+        # If the widget is destroyed, remove it from our tracking list
+        # To avoid a crash on shutdown, we capture the widget's info now,
+        # before it's destroyed. The lambda will then log this safe info
+        # instead of the potentially deleted widget object.
+        widget_info = "'%s' (%s)" % (widget.windowTitle(), widget.objectName())
+        widget.destroyed.connect(
+            lambda: self._on_dialog_destroyed(widget, widget_info)
+        )
+
+        return widget
+
+    def _on_dialog_destroyed(self, widget, widget_info):
+        """
+        Callback slot for when a dialog is destroyed.
+
+        Removes the widget from the list of tracked dialogs.
+
+        :param widget: The widget that was destroyed.
+        """
+        try:
+            if widget in self.created_qt_dialogs:
+                self.created_qt_dialogs.remove(widget) # Correctly remove the widget
+                self.logger.debug("Dialog destroyed and removed from tracking: %s", widget_info)
+        except (RuntimeError, ValueError):
+            # This can happen if the widget is already gone or list is modified elsewhere.
+            self.logger.debug("Dialog was already removed from tracking: %s", widget_info)
+
+    def show_panel(self, panel_id, title, bundle, widget_class, *args, **kwargs):
+        """
+        Displays a panel as a dockable widget in Substance 3D Painter.
+
+        :param panel_id: Unique identifier for the panel.
+        :param title: The title of the panel.
+        :param bundle: The app bundle that is requesting the panel.
+        :param widget_class: The QWidget class to instantiate for the panel.
+
+        For more on the Substance 3D Painter UI API, see:
+        https://substance3d.adobe.com/documentation/pt/python-api/api/substance_painter/ui
+        :returns: The created panel widget.
+        """
+        
+        self.logger.info("Showing panel '%s' in a dockable widget...", panel_id)
+
+        # Allow the title to be customized via the app's settings.
+        panel_title = bundle.get_setting("panel_title", title)
+        self.logger.debug("Resolved panel title to: '%s'", panel_title)
+
+        # Check if a panel with the same ID is already registered and visible.
+        if panel_id in self._dock_widgets:
+            widget = self._dock_widgets[panel_id]
+            if widget:
+                widget.show()
+                widget.raise_()
+                return widget
+
+        try:
+            # Create the panel widget
+            widget = self.create_widget_from_class(widget_class, self._get_dialog_parent())
+            widget.setObjectName(panel_id)
+            widget.setWindowTitle(panel_title)
+
+            # Add the widget to the Substance 3D Painter UI as a dockable widget.
+            self.app.ui.add_dock_widget(widget)
+
+            # Store a reference to it
+            self._dock_widgets[panel_id] = widget
+
+            return widget
+
+        except Exception as e:
+            self.logger.exception(
+                "Failed to create panel widget for '%s'. Error: %s", panel_id, e
+            )
+            return None
 
     @property
     def app(self):
         """
         A client object that provides an API for interacting with Substance 3D Painter.
+
+        In the pure Python plugin model, this is a direct wrapper around the
+        `substance_painter` module, allowing for direct API calls.
         """
         return self._dcc_app
-
-    def show_message(self, msg, level="info"):
-        """
-        Displays a dialog with the message according to  the severity level
-        specified.
-        """
-        if self._qt_app_central_widget:
-            from sgtk.platform.qt5 import QtWidgets, QtGui, QtCore
-
-            level_icon = {
-                "info": QtWidgets.QMessageBox.Information,
-                "error": QtWidgets.QMessageBox.Critical,
-                "warning": QtWidgets.QMessageBox.Warning,
-            }
-
-            dlg = QtWidgets.QMessageBox(self._qt_app_central_widget)
-            dlg.setIcon(level_icon[level])
-            dlg.setText(msg)
-            dlg.setWindowTitle("FlowPTR Substance 3D Painter engine")
-            dlg.setWindowFlags(dlg.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
-            dlg.show()
-            dlg.exec_()
-
-    def show_error(self, msg):
-        """
-        Displays an error dialog message
-        """
-        self.show_message(msg, level="error")
-
-    def show_warning(self, msg):
-        """
-        Displays a warning dialog message
-        """
-        self.show_message(msg, level="warning")
-
-    def show_info(self, msg):
-        """
-        Displays an informative dialog message
-        """
-        self.show_message(msg, level="info")
 
     def __get_platform_resource_path(self, filename):
         """
@@ -233,9 +211,7 @@ class SubstancePainterEngine(Engine):
         Toggles global debug logging on and off in the log manager.
         This will affect all logging across all of toolkit.
         """
-        self.logger.debug(
-            "calling Substance 3D Painter with debug: %s" % LogManager().global_debug
-        )
+        self.logger.debug("calling Substance 3D Painter with debug: %s" % LogManager().global_debug)
 
         # flip debug logging
         LogManager().global_debug = not LogManager().global_debug
@@ -246,12 +222,10 @@ class SubstancePainterEngine(Engine):
         """
         Opens the file system folder where log files are being stored.
         """
-        self.log_info("Log folder is located in '%s'" % LogManager().log_folder)
+        self.logger.debug("Log folder is located in '%s'" % LogManager().log_folder)
 
         if self.has_ui:
             # only import QT if we have a UI
-            from sgtk.platform.qt import QtGui, QtCore
-
             url = QtCore.QUrl.fromLocalFile(LogManager().log_folder)
             status = QtGui.QDesktopServices.openUrl(url)
             if not status:
@@ -328,7 +302,7 @@ class SubstancePainterEngine(Engine):
 
         host_info = {"name": "Substance3DPainter", "version": "unknown"}
         try:
-            painter_version = self._dcc_app.get_application_version()
+            painter_version = self._dcc_app.project.get_application_version()
             host_info["version"] = painter_version
         except Exception:
             pass
@@ -339,6 +313,10 @@ class SubstancePainterEngine(Engine):
         This method is the primary entry point for commands sent from the
         QML plugin running inside Substance 3D Painter. It acts as a dispatcher,
         routing requests to the appropriate engine methods.
+
+        .. note::
+            In the pure Python plugin model, this method is no longer actively
+            used, as communication happens via direct Python calls.
 
         :param str method: The name of the command to process.
         :param dict kwargs: A dictionary of parameters for the command.
@@ -357,7 +335,7 @@ class SubstancePainterEngine(Engine):
             path = kwargs.get("path")
             change_context = self.get_setting("change_context_on_new_project", False)
             if change_context:
-                refresh_engine(path, self.context)
+                self.change_context_from_path(path)
             else:
                 self.logger.info(
                     "change_context_on_new_project is off so context won't be changed."
@@ -365,12 +343,7 @@ class SubstancePainterEngine(Engine):
 
         if method == "PROJECT_OPENED":
             path = kwargs.get("path")
-            refresh_engine(path, self.context)
-
-        if method == "QUIT":
-            if self._qt_app:
-                self.destroy_engine()
-                self._qt_app.quit()
+            self.change_context_from_path(path)
 
         if method in self._event_callbacks:
             self.logger.info("About to run callbacks for %s" % method)
@@ -401,21 +374,14 @@ class SubstancePainterEngine(Engine):
     def pre_app_init(self):
         """
         Initializes the Substance 3D Painter engine.
+
+        This is a core Toolkit lifecycle method, called by `start_engine`
+        before any apps are loaded. It's the ideal place to set up the
+        environment, check for compatibility, and prepare the engine.
         This is called before any apps are initialized.
         """
 
         self.logger.debug("%s: Initializing...", self)
-
-        self.tk_substancepainter = self.import_module("tk_substancepainter")
-        self.utils = self.tk_substancepainter.utils
-
-        self.init_qt_app()
-
-        port = os.environ["SGTK_SUBSTANCEPAINTER_ENGINE_PORT"]
-        url = "ws://localhost:%s" % port
-
-        engine_client_class = self.tk_substancepainter.application.EngineClient
-        self._dcc_app = engine_client_class(self, parent=self._qt_app, url=url)
 
         # check that we are running an ok version of Substance Painter
         current_os = sys.platform
@@ -432,54 +398,6 @@ class SubstancePainterEngine(Engine):
         if self.get_setting("use_sgtk_as_menu_name", False):
             self._menu_name = "Sgtk"
 
-        painter_version_str = self._dcc_app.get_application_version()
-
-        # Normalize the version strings for reliable comparison.
-        # This handles different versioning schemes used by Substance 3D Painter over the years.
-        painter_version = self.utils.to_normalized_version(painter_version_str)
-        painter_min_supported_version = self.utils.to_normalized_version(MINIMUM_SUPPORTED_VERSION)
-
-        if painter_version < painter_min_supported_version:
-            msg = (
-                "FlowPTR integration is not compatible with Substance 3D Painter versions"
-                " older than %s" % MINIMUM_SUPPORTED_VERSION
-            )
-            raise tank.TankError(msg)
-
-        if painter_version > painter_min_supported_version:
-            # show a warning that this version of Substance 3D Painter isn't yet fully tested
-            # with Flow Production Tracking:
-            msg = (
-                "The FlowPTR Pipeline Toolkit has not yet been fully "
-                "tested with Substance 3D Painter %s.  "
-                "You can continue to use Toolkit but you may experience "
-                "bugs or instability."
-                "\n\n" % (painter_version)
-            )
-
-            # determine if we should show the compatibility warning dialog:
-            show_warning_dlg = self.has_ui and SHOW_COMP_DLG not in os.environ
-
-            if show_warning_dlg:
-                # make sure we only show it once per session
-                os.environ[SHOW_COMP_DLG] = "1"
-
-                # check against the compatibility_dialog_min_version
-                # setting
-                min_version_str = self.get_setting("compatibility_dialog_min_version")
-
-                min_version = self.utils.to_normalized_version(min_version_str)
-                if painter_version < min_version:
-                    show_warning_dlg = False
-
-            if show_warning_dlg:
-                # Note, title is padded to try to ensure dialog isn't insanely
-                # narrow!
-                self.show_warning(msg)
-
-            # always log the warning to the script editor:
-            self.logger.warning(msg)
-
             # In the case of Windows, we have the possibility of locking up if
             # we allow the PySide shim to import QtWebEngineWidgets.
             # We can stop that happening here by setting the following
@@ -493,65 +411,17 @@ class SubstancePainterEngine(Engine):
                 )
                 os.environ["SHOTGUN_SKIP_QTWEBENGINEWIDGETS_IMPORT"] = "1"
 
-    def create_shotgun_menu(self, disabled=False):
-        """
-        Creates the main Flow Production Tracking menu.
-        Note that this only creates the menu, not the child actions
-        :return: bool
-        """
-
-        # only create the FlowPTR menu if not in batch mode and menu doesn't
-        # already exist
-        if self.has_ui:
-            # create our menu handler
-            self._menu_generator = self.tk_substancepainter.MenuGenerator(
-                self, self._menu_name
-            )
-
-            self._qt_app.setActiveWindow(self._menu_generator.menu_handle)
-            self._menu_generator.create_menu(disabled=disabled)
-            return True
-
-        return False
-
-    def display_menu(self, pos=None):
-        """
-        Shows the engine's main menu at the given screen position.
-        """
-        if self._menu_generator:
-            self._menu_generator.show(pos)
-
-    def init_qt_app(self):
-        """
-        Initializes if not done already the QT Application for the engine.
-
-        This method ensures that a QApplication instance exists, which is required
-        for displaying any Qt-based UIs from Toolkit apps. It also sets up a
-        main window to act as a parent for dialogs.
-        """
-        from sgtk.platform.qt5 import QtWidgets, QtGui
-
-        if not QtWidgets.QApplication.instance():
-            self._qt_app = QtWidgets.QApplication(sys.argv)
-            self._qt_app.setWindowIcon(QtGui.QIcon(self.icon_256))
-
-            self._qt_app_main_window = QtWidgets.QMainWindow()
-            self._qt_app_central_widget = QtWidgets.QWidget()
-            self._qt_app_main_window.setCentralWidget(self._qt_app_central_widget)
-            self._qt_app.setQuitOnLastWindowClosed(False)
-
-            # Make the QApplication use the dark theme. Must be called after the QApplication is instantiated
-            self._initialize_dark_look_and_feel()
-
-        else:
-            self._qt_app = QtWidgets.QApplication.instance()
-
+    
     def post_app_init(self):
         """
         Called after all apps have been initialized.
-        This is where we create the main menu, run startup apps, and start the
-        main Qt event loop.
+
+        This is a core Toolkit lifecycle method. It's the perfect place to
+        finalize the UI (like creating the menu) and run any startup logic,
+        as all app commands are now available.
+        This is where we create the main menu and run startup apps.
         """
+        self.logger.debug("Engine 'post_app_init' starting...")
 
         # for some reason this engine command get's lost so we add it back
         self.__register_reload_command()
@@ -562,22 +432,19 @@ class SubstancePainterEngine(Engine):
         # Create the FlowPTR menu
         self.create_shotgun_menu()
 
-        # Let the app know we are ready for action!
-        self._dcc_app.broadcast_event("ENGINE_READY")
-
         # make sure we setup this engine as the current engine for the platform
         tank.platform.engine.set_current_engine(self)
 
         # emit an engine started event
         self.sgtk.execute_core_hook(TANK_ENGINE_INIT_HOOK_NAME, engine=self)
-
-        # initalize qt loop
-        self._qt_app.exec_()
+        self.logger.debug("Engine 'post_app_init' finished.")
 
     def post_context_change(self, old_context, new_context):
         """
         Runs after a context change. The Substance 3D Painter event watching will
         be stopped and new callbacks registered containing the new context
+        information. This ensures that all app UIs and actions are updated to
+        reflect the new Shot, Asset, or Task that the user is working on.
         information.
 
         :param old_context: The context being changed away from.
@@ -589,10 +456,12 @@ class SubstancePainterEngine(Engine):
         self.__register_open_log_folder_command()
         self.__register_reload_command()
 
+        '''
         if self.get_setting("automatic_context_switch", True):
             # finally create the menu with the new context if needed
             if old_context != new_context:
                 self.create_shotgun_menu()
+        '''
 
     def _run_app_instance_commands(self):
         """
@@ -642,7 +511,7 @@ class SubstancePainterEngine(Engine):
                             app_instance_name,
                             cmd_name,
                         )
-                        self.logger.debug(msg)
+                        self.logger.debug(*msg)
 
                         command_function()
                 else:
@@ -656,8 +525,7 @@ class SubstancePainterEngine(Engine):
                             app_instance_name,
                             setting_cmd_name,
                         )
-                        self.logger.debug(msg)
-
+                        self.logger.debug(*msg)
                         command_function()
                     else:
                         known_commands = ", ".join("'%s'" % name for name in cmd_dict)
@@ -671,23 +539,139 @@ class SubstancePainterEngine(Engine):
                             known_commands,
                         )
 
+    def create_shotgun_menu(self, disabled=False):
+        """
+        Creates the main Flow Production Tracking menu.
+
+        This method uses the MenuGenerator class to build a QMenu object based
+        on the commands registered by all the loaded Toolkit apps.
+
+        :return: bool
+        """
+
+        if self.has_ui and self.app.ui:
+            self.logger.info("Creating Flow Production Tracking menu...")
+            self._menu_generator = self.import_module("tk_substancepainter.menu_generation").MenuGenerator(self, self._menu_name)
+            self.logger.info("MenuGenerator instantiated. Building menu...")
+            self._menu_generator.create_menu()
+
+            main_window = self._get_dialog_parent()
+            menu_bar = main_window.menuBar()
+
+            help_action = None
+            for action in menu_bar.actions():
+                if action.text().replace("&", "") == "Help":
+                    help_action = action
+                    break
+
+            if help_action:
+                menu_bar.insertMenu(help_action, self._menu_generator.menu_handle)
+            else:
+                menu_bar.addMenu(self._menu_generator.menu_handle)
+
+            self.logger.info("Flow Production Tracking menu created successfully.")
+            return True
+
+        return False
+
     def destroy_engine(self):
         """
         Called when the engine is being destroyed.
         """
-        self.logger.debug("%s: Destroying...", self)
+
+        self.logger.debug("{}: Destroying...".format(self))
+
+
+        # Set a flag to indicate that shutdown has started. This helps prevent
+        # deadlocks in the logging system by switching to synchronous logging.
+        self._is_shutting_down = True
+
+        # --- CRITICAL STEP: Find and synchronously stop all data retrievers ---
+        # This is the most reliable way to prevent the "QThread destroyed while
+        # running" crash. We must find all ShotgunDataRetriever instances and
+        # call their stop() method, which is a blocking call that waits for
+        # background threads to terminate.
+        self.logger.debug("Scanning for active ShotgunDataRetrievers to stop...")
+        try:
+            
+            all_widgets = self.created_qt_dialogs + list(self._dock_widgets.values())
+            for widget in all_widgets:
+                for child in [widget] + widget.findChildren(QtWidgets.QWidget):
+                    model = getattr(child, "_model", None)
+                    if model:
+                        retriever = getattr(model, "_sg_data_retriever", None)
+                        if retriever and hasattr(retriever, "stop"):
+                            self.logger.info("Found ShotgunDataRetriever. Stopping it now...")
+                            retriever.stop()
+                            self.logger.info("ShotgunDataRetriever stopped successfully.")
+                            # Assuming one retriever per top-level widget is enough to check
+                        break
+
+            # --- Add a delay and process events to ensure threads have time to exit ---
+            # After requesting the stop, we need to give the Qt event loop a moment
+            # to process the thread's termination signals before we destroy the UI.
+            self.logger.debug("Waiting for background threads to terminate...")
+            QtCore.QCoreApplication.processEvents()
+            time.sleep(0.5) # A short, blocking delay can resolve race conditions.
+            QtCore.QCoreApplication.processEvents()
+            self.logger.debug("Dackground threads terminated")
+
+        except Exception as e:
+            self.logger.exception("An error occurred while stopping data retrievers: %s", e)
+
+        # Now that all background threads are stopped, it is safe to destroy the UI
+        self.close_windows()
+
+        try:
+            super(SubstancePainterEngine, self).destroy_engine()
+            self.logger.debug("tk-substancepainter Engine destroyed.")
+        except Exception as e:
+            self.logger.error(f"Error during base engine destruction: {e}")
 
     def _get_dialog_parent(self):
         """
         Get the QWidget parent for all dialogs created through
         show_dialog & show_modal.
+
+        In the pure Python model, this should return the main Substance 3D Painter
+        window to ensure that Toolkit dialogs are correctly parented and
+        behave as expected within the application.
         """
-        return self._qt_app_main_window
+        return self._dcc_app.ui.get_main_window()
+
+    def close_windows(self):
+        """
+        Closes the various windows (dialogs, panels, etc.) opened by the
+        engine.
+        """
+        self.logger.debug("Closing all tracked UI windows...")
+
+        # Make a copy of the lists to iterate over, as closing widgets will
+        # modify the original lists via the `_on_dialog_destroyed` callback.
+        all_widgets = self.created_qt_dialogs[:] + list(self._dock_widgets.values())
+
+        for widget in all_widgets:
+            try:
+                # For dock widgets, we should also remove them from the main UI
+                if isinstance(widget, QDockWidget) and widget.parent():
+                    self.logger.debug(f"Removing dock widget from UI: {widget.windowTitle()}")
+                    self.app.ui.remove_dock_widget(widget)
+
+                widget.close()
+                self.logger.debug(f"Closed widget: {widget.windowTitle()}")
+            except Exception as e:
+                self.logger.warning(f"Could not close widget '{widget.windowTitle()}'. It may have already been destroyed. Error: {e}")
+
+        self._dock_widgets.clear()
+
+
 
     @property
     def has_ui(self):
         """
         Detect and return if Substance 3D Painter is running in batch mode
+
+        :returns: True if the application has a UI, False otherwise.
         """
         return True
 
@@ -695,6 +679,9 @@ class SubstancePainterEngine(Engine):
         """
         Called by the engine to log messages.
         All log messages from the toolkit logging namespace will be passed to
+        this method. This is the bridge between Toolkit's logging system and
+        the host application's output window or console.
+
         this method.
 
         :param handler: Log handler that this message was dispatched from.
@@ -714,41 +701,71 @@ class SubstancePainterEngine(Engine):
 
         msg = formatter.format(record).replace("\n", "\n... ")
 
-        # Select Substance 3D Painter display function to use according to the logging
-        # record level.
+        # Determine the correct Substance 3D Painter log function to call based on the record level.
+        # We create a lambda to wrap the call, which will be executed on the main thread.
         if record.levelno >= logging.ERROR:
-            fct = display_error
+            log_fct = lambda: self._dcc_app.logging.error(msg)
         elif record.levelno >= logging.WARNING:
-            fct = display_warning
+            log_fct = lambda: self._dcc_app.logging.warning(msg)
         elif record.levelno >= logging.INFO:
-            fct = display_info
+            log_fct = lambda: self._dcc_app.logging.info(msg)
         else:
-            fct = display_debug
+            # For debug messages, we use the generic log() function with the DBG_INFO severity
+            # and specify our own channel name, as per the API documentation.
+            log_fct = lambda: self._dcc_app.logging.log(
+                self._dcc_app.logging.DBG_INFO, "FlowPTR", msg
+            )
 
-        # Display the message in Substance 3D Painter script editor in a thread safe manner.
-        self.async_execute_in_main_thread(fct, msg)
+        # During shutdown, the async handler can cause a deadlock.
+        # If the engine is shutting down, bypass the async call and print directly.
+        # This is less elegant but ensures the application can exit cleanly.
+        if self._is_shutting_down:
+            # During shutdown, call the log function directly instead of using
+            # the async handler to avoid deadlocks. This is safer than print().
+            log_fct()
+        else:
+            # Display the message in Substance 3D Painter script editor in a thread safe manner.
+            self.async_execute_in_main_thread(log_fct)
 
-    def close_windows(self):
-        """
-        Closes the various windows (dialogs, panels, etc.) opened by the
-        engine.
-        """
+def get_all_ui_panels() -> List[QWidget]:
+    """
+    Recursively searches the application's main window for all active QWidgets
+    that might represent a custom panel or dockable UI element.
+    """
+    """
+    app = QApplication.instance()
+    
+    if not app:
+        print("Error: QApplication instance not found.")
+        return []
 
-        # Make a copy of the list of Tank dialogs that have been created by the
-        # engine and are still opened since the original list will be updated
-        # when each dialog is closed.
-        opened_dialog_list = self.created_qt_dialogs[:]
+    # Get the active window (often the main application window of Substance Painter)
+    main_window = app.activeWindow()
+    
+    if not main_window:
+        # Fallback: sometimes the active window is None during certain states
+        # The next best parent is often the application instance itself,
+        # or the QMainWindow that contains the menubar.
+        main_window = app.topLevelWidgets()[0] if app.topLevelWidgets() else None
 
-        # Loop through the list of opened Tank dialogs.
-        for dialog in opened_dialog_list:
-            dialog_window_title = dialog.windowTitle()
-            try:
-                # Close the dialog and let its close callback remove it from
-                # the original dialog list.
-                self.logger.debug("Closing dialog %s.", dialog_window_title)
-                dialog.close()
-            except Exception as exception:
-                traceback.print_exc()
-                self.logger.error(
-                    "Cannot close dialog %s: %s", dialog_window_title, exception
-                )
+    if main_window:
+        # Use findChildren to recursively search for all QWidget objects.
+        # This will find everything—including menus, buttons, and panels—but
+        # it is the most comprehensive starting point.
+        all_widgets = main_window.findChildren(
+            QWidget,
+            options=Qt.FindChildrenRecursively
+        )
+        
+        # Filter for top-level panels/docks (widgets with no parent or QMainWindow children)
+        # For a practical list of panels, you might filter further:
+        
+        panels_and_docks = [
+            w for w in all_widgets
+            if w.windowType() == Qt.WindowType.DockWidget
+        ]
+        
+        return all_widgets  # Returning all widgets for a comprehensive list
+    
+    return []
+    """

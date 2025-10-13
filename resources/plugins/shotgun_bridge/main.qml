@@ -18,7 +18,7 @@ import "."
 /**
  * main.qml
  *
- * This is the main entry point for the Flow Production Tracking integration
+ * This is the main entry point for the Flow Production Tracking (FlowPTR) integration
  * plugin within Adobe Substance 3D Painter.
  *
  * It performs the following key functions:
@@ -28,13 +28,14 @@ import "."
  * - Exposes Substance 3D Painter's project and application APIs to the Python engine
  *   through registered commands.
  */
-PainterPlugin
+Item
 {
   id: root
-  property var openMenuButton: null
-  property bool isEngineLoaded: false
-  property bool debug: true;
- 
+
+  PainterPlugin {
+    id: painterPlugin
+  }
+
   /**
    * Helper function to extract a message string from a data object.
    * @param {any} data - The input data, which can be a string or an object with a 'message' property.
@@ -73,8 +74,9 @@ PainterPlugin
   {
     // This block is executed once when the plugin is first loaded.
     // It handles the initial setup of the bridge.
+    console.log("FlowPTR Bridge: Component.onCompleted started.");
 
-    log_debug("Initializing FlowPTR Bridge Plugin.");
+    painterPlugin.log_debug("Initializing FlowPTR Bridge Plugin.");
 
     // get the port we have been assigned from sthe startup software launcher
     var args = Qt.application.arguments[1];
@@ -88,20 +90,20 @@ PainterPlugin
       // Substance 3D Painter was not launched through the FlowPTR launcher.
       // we are not in a shotgun toolkit environment, so we bail out as soon as
       // possible
-      log_warning("Not in a Flow Production Tracking environment so the engine won't be run. Have you launched Substance 3D Painter through the FlowPTR Desktop application?");
+      painterPlugin.log_warning("Not in a Flow Production Tracking environment so the engine won't be run. Have you launched Substance 3D Painter through the FlowPTR Desktop application?");
       return;
     }
 
     var sgtk_substancepainter_engine_port = query.SGTK_SUBSTANCEPAINTER_ENGINE_PORT;
     
     server.port = parseInt(sgtk_substancepainter_engine_port);
-    log_debug("Engine port:" + server.port);
+    painterPlugin.log_debug("Engine port:" + server.port);
     server.listen = true;
 
-    openMenuButton = alg.ui.addWidgetToPluginToolBar("menu.qml");
+    var openMenuButton = alg.ui.addWidgetToPluginToolBar("menu.qml");
 
     openMenuButton.clicked.connect(displayMenu);
-    openMenuButton.enabled = Qt.binding(function() { return root.isEngineLoaded; });
+    openMenuButton.enabled = Qt.binding(function() { return server.isEngineLoaded; });
 
     // We initialize here the engine instead of when the app has finished 
     // loading because the user can always reload the plugin from the Plugins
@@ -112,7 +114,9 @@ PainterPlugin
     }
   }
 
-  onNewProjectCreated:
+  Connections {
+    target: alg.project
+    onNewProjectCreated:
   {
     // This signal is emitted by Substance 3D Painter when a new project is created.
     // We check if a mesh was imported and, if so, send its path to the engine
@@ -129,14 +133,18 @@ PainterPlugin
       server.sendCommand("NEW_PROJECT_CREATED", {path:mesh_path});
     }
   }
+  }
 
-  onProjectOpened:
+  Connections {
+    target: alg.project
+    onProjectOpened:
   {
     // This signal is emitted by Substance 3D Painter when a project is fully loaded.
     // We send the project path to the engine so it can synchronize its context.
 
     // Called when the project is fully loaded
     server.sendCommand("PROJECT_OPENED", {path:currentProjectPath()});
+  }
   }
 
   function getQueryParams(qs)
@@ -175,7 +183,7 @@ PainterPlugin
      * If the process crashed, it attempts to restart it to maintain the connection.
      */
     // We try to keep the engine alive by restarting it if something went wrong.
-    log_warning("FlowPTR Engine connection was lost. Restarting engine...");
+    painterPlugin.log_warning("FlowPTR Engine connection was lost. Restarting engine...");
     if (result.crashed)
     {
       bootstrapEngine();
@@ -199,7 +207,7 @@ PainterPlugin
     const sgtk_substancepainter_engine_startup = '"' + query.SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP+ '"'
     const sgtk_substancepainter_engine_python = '"' + query.SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON + '"'
     
-    log_debug("Starting tk-substancepainter engine with params: " + sgtk_substancepainter_engine_python + " " + sgtk_substancepainter_engine_startup)
+    painterPlugin.log_debug("Starting tk-substancepainter engine with params: " + sgtk_substancepainter_engine_python + " " + sgtk_substancepainter_engine_startup)
     alg.subprocess.start(sgtk_substancepainter_engine_python + " " + sgtk_substancepainter_engine_startup, onProcessEndedCallback)
   }
 
@@ -210,7 +218,7 @@ PainterPlugin
      * It includes the position where the user clicked the toolbar button.
      */
     // tells the engine to show the menu
-    server.sendCommand("DISPLAY_MENU", {clickedPosition: root.openMenuButton.clickedPosition});
+    server.sendCommand("DISPLAY_MENU", {clickedPosition: openMenuButton.clickedPosition});
   }
 
  function sendProjectInfo() 
@@ -230,9 +238,9 @@ PainterPlugin
     /**
      * Called when the WebSocket connection is lost. It attempts to restart the engine.
      */
-    root.isEngineLoaded = false;
+    server.isEngineLoaded = false;
 
-    log_warning("FlowPTR Engine connection was lost. Reconnecting ...");
+    painterPlugin.log_warning("FlowPTR Engine connection was lost. Reconnecting ...");
     bootstrapEngine();
   }
 
@@ -253,8 +261,8 @@ PainterPlugin
      * Callback executed when the Python engine signals that it is fully initialized.
      * This enables the UI and synchronizes the project context.
      */
-    log_info("Engine is ready.")  
-    root.isEngineLoaded = true;
+    painterPlugin.log_info("Engine is ready.")
+    server.isEngineLoaded = true;
     
     // update the engine context accoding to the current project loaded
     server.sendCommand("PROJECT_OPENED", {path:currentProjectPath()});
@@ -582,7 +590,7 @@ PainterPlugin
      * Callback to enable or disable debug logging for this plugin.
      */
     alg.log.debug("Debug Logging is : " + data.enabled);
-    root.debug = data.enabled;
+    painterPlugin.debug = data.enabled;
     server.debug = data.enabled;
   }
 
@@ -592,11 +600,11 @@ PainterPlugin
     id: server
     Component.onCompleted:
     {
-      registerCallback("LOG_INFO", log_info);
-      registerCallback("LOG_WARNING", log_warning);
-      registerCallback("LOG_DEBUG", log_debug);
-      registerCallback("LOG_ERROR", log_error);
-      registerCallback("LOG_EXCEPTION", log_exception);
+      registerCallback("LOG_INFO", painterPlugin.log_info);
+      registerCallback("LOG_WARNING", painterPlugin.log_warning);
+      registerCallback("LOG_DEBUG", painterPlugin.log_debug);
+      registerCallback("LOG_ERROR", painterPlugin.log_error);
+      registerCallback("LOG_EXCEPTION", painterPlugin.log_exception);
 
       registerCallback("SEND_PROJECT_INFO", sendProjectInfo);
       registerCallback("GET_VERSION", getVersion);

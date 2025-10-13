@@ -1,7 +1,13 @@
 {
-	"description": "Flow Production Tracking (ShotGrid/Shotgun) Engine for Adobe Substance 3D Painter. Allows communication with Flow Production Tracking (ShotGrid/Shotgun) toolkit. Author: Diego Garcia Huerta",
-	"url": "https://github.com/StephenAnimates/tk-substancepainter",
-	"version": "0.1.0",
-	"license": "<a href=\"https://github.com/StephenAnimates/tk-substancepainter/blob/master/LICENSE\">FlowPTR Pipeline Toolkit Source Code License</a>",
-	"min_api_version": "2.0.5"
+  "name": "Flow Production Tracking Bridge",
+  "description": "Flow Production Tracking (ShotGrid/Shotgun) Engine for Adobe Substance 3D Painter. Allows communication with Flow Production Tracking (ShotGrid/Shotgun) toolkit.",
+  "version": "1.0.0",
+  "main": "main.qml",
+  "author": "Stephen Studyvin",
+  "url": "https://github.com/StephenAnimates/tk-substancepainter",
+  "minimumPainterVersion": "2018.3.0",
+  "tags": ["Flow Production Tracking", "ShotGrid", "Toolkit", "Pipeline"],
+  "api_version": "1.0.0",
+  "min_api_version": "2.0.5",
+  "license": "<a href=\"https://opensource.org/licenses/MIT\">MIT</a>"
 }

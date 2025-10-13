@@ -1,0 +1,52 @@
+# This file contains the engine configuration blocks for tk-substancepainter.
+#
+# To integrate Substance 3D Painter into your tk-config-default2 project,
+# copy the relevant blocks below and paste them at the end of your
+# environment files (e.g., config/env/asset_step.yml, config/env/project.yml).
+#
+# This ensures that the Substance 3D Painter engine and its apps are loaded
+# in the correct contexts.
+
+# ----------------------------------------------------------------------------
+# Asset Step Environment Configuration
+#
+# Copy and paste the following block into your 'config/env/asset_step.yml'
+# ----------------------------------------------------------------------------
+
+tk-substancepainter.asset_step:
+  apps:
+    tk-multi-about: "@apps.tk-multi-about.location"
+    tk-multi-workfiles2: "@tk-multi-workfiles2.substancepainter.asset"
+    tk-multi-publish2: "@tk-multi-publish2.substancepainter.asset"
+    tk-multi-loader2: "@tk-multi-loader2.substancepainter"
+    tk-multi-breakdown2: "@tk-multi-breakdown2.substancepainter"
+    tk-multi-shotgunpanel: "@tk-multi-shotgunpanel"
+    tk-multi-pythonconsole: "@tk-multi-pythonconsole"
+  menu_favourites:
+  - {app_instance: tk-multi-workfiles2, name: File Open...}
+  - {app_instance: tk-multi-workfiles2, name: File Save...}
+  location: "@tk-substancepainter"
+
+# ----------------------------------------------------------------------------
+# Project Environment Configuration
+#
+# Copy and paste the following block into your 'config/env/project.yml'
+# ----------------------------------------------------------------------------
+
+tk-substancepainter.project:
+  apps:
+    tk-multi-about: "@apps.tk-multi-about.location"
+    tk-multi-workfiles2: "@tk-multi-workfiles2.substancepainter.project"
+    tk-multi-shotgunpanel: "@tk-multi-shotgunpanel"
+    tk-multi-pythonconsole: "@tk-multi-pythonconsole"
+  menu_favourites:
+  - {app_instance: tk-multi-workfiles2, name: File Open...}
+  location: "@tk-substancepainter"
+  run_at_startup:
+  - {app_instance: tk-multi-shotgunpanel, name: 'Flow Production Tracking'}
+
+# Note: The '@' syntax requires that the corresponding app settings
+# (e.g., '@tk-multi-workfiles2.substancepainter.asset') are defined in an
+# included settings file, such as 'config/env/includes/substancepainter/settings.yml',
+# and the engine location ('@tk-substancepainter') is defined in
+# 'config/env/includes/engine_locations.yml'.

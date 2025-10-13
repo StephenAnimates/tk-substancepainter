@@ -2,7 +2,7 @@
 #
 # CONFIDENTIAL AND PROPRIETARY
 #
-# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit
+# This work is provided 'AS IS' and subject to the Shotgun Pipeline Toolkit
 # Source Code License included in this distribution package. See LICENSE.
 # By accessing, using, copying or modifying this work you indicate your
 # agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
@@ -18,12 +18,12 @@ includes:
 
 substancepainter.project:
   apps:
-    tk-multi-about: "@common.apps.tk-multi-about"
-    tk-multi-shotgunpanel: '@substancepainter.apps.tk-multi-shotgunpanel'
-    tk-multi-workfiles2: "@substancepainter.apps.tk-multi-workfiles2.project"
-    tk-multi-pythonconsole: "@common.apps.tk-multi-pythonconsole"
+    tk-multi-about: '@common.apps.tk-multi-about'
+    tk-multi-shotgunpanel: '@common.apps.tk-multi-shotgunpanel'
+    tk-multi-workfiles2: '@substancepainter.apps.tk-multi-workfiles2.project'
+    tk-multi-pythonconsole: '@common.apps.tk-multi-pythonconsole'
   menu_favourites:
   - {app_instance: tk-multi-workfiles2, name: File Open...}
-  location: "@engines.tk-substancepainter.location"
+  location: '@engines.tk-substancepainter.location'
   run_at_startup:
-  - {app_instance: tk-multi-shotgunpanel, name: ''}
+  - {app_instance: tk-multi-shotgunpanel, name: 'Flow Production Tracking'}
